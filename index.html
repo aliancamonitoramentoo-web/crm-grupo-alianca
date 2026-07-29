@@ -322,6 +322,7 @@ tr:hover td{background:rgba(255,255,255,.017);}
       <div class="ni" data-p="clientes" onclick="go('clientes',this)"><span class="nic">👥</span>Clientes<span class="nb g" id="nb-clientes">0</span></div>
       <div class="ni" data-p="historico" onclick="go('historico',this)"><span class="nic">📋</span>Histórico</div>
       <div class="ni" data-p="proposta" onclick="go('proposta',this)"><span class="nic">📑</span>Propostas<span class="nb" id="nb-proposta">0</span></div>
+      <div class="ni" data-p="orcamento" onclick="go('orcamento',this)"><span class="nic">🧾</span>Orçamentos<span class="nb" id="nb-orc">0</span></div>
       <div class="ni" data-p="inteligencia" onclick="go('inteligencia',this)"><span class="nic">🧠</span>Inteligência<span class="nb g">IA</span></div>
     </div>
 
@@ -775,6 +776,19 @@ tr:hover td{background:rgba(255,255,255,.017);}
     <button class="btn bg adm" style="margin-left:auto" onclick="novaPropostaModal()">+ Nova Proposta</button>
   </div>
   <div id="prop-lista"></div>
+</div>
+
+<!-- ████ ORÇAMENTOS ████ -->
+<div class="pg" id="pg-orcamento">
+  <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
+    <div class="srch" style="max-width:260px"><span style="color:var(--t3)">🔍</span><input type="text" placeholder="Buscar orçamento..." oninput="filtrarOrcamentos(this.value)"></div>
+    <div class="fb on" onclick="filtrarOrcStatus(this,'all')">Todos</div>
+    <div class="fb" onclick="filtrarOrcStatus(this,'pendente')">Pendentes</div>
+    <div class="fb" onclick="filtrarOrcStatus(this,'aprovado')">Aprovados</div>
+    <div class="fb" onclick="filtrarOrcStatus(this,'rejeitado')">Rejeitados</div>
+    <button class="btn bg adm" style="margin-left:auto" onclick="novoOrcamento()">+ Novo Orçamento</button>
+  </div>
+  <div id="orc-lista" style="display:flex;flex-direction:column;gap:9px;margin-top:4px"></div>
 </div>
 
 <!-- ████ HISTÓRICO DE CLIENTES ████ -->
@@ -1353,7 +1367,8 @@ function go(id,el){
   abrirGrupoDoItem(id);
   if(id==='email')    setTimeout(rEmailPage,100);
   if(id==='admin')    setTimeout(rAdminPanel,100);
-  if(id==='proposta') setTimeout(rPropostas,100);
+  if(id==='proposta')  setTimeout(rPropostas,100);
+  if(id==='orcamento') setTimeout(rOrcamentos,100);
   if(id==='historico'){ setTimeout(()=>{popularHistoricoSel();rHistorico(_histCliente);},100); }
   if(id==='whatsapp') setTimeout(()=>{ rWACfg(); rWAAutoCfg(); },100);
   if(id==='os')       setTimeout(()=>{ rOS(); rTecnicos(); },100);
@@ -6506,6 +6521,381 @@ function getNichoAtual(){
 }
 
 
+// ═══════════════════════════════════════════════════
+//  🧾 ORÇAMENTOS
+// ═══════════════════════════════════════════════════
+
+if(!DB.orcamentos) DB.orcamentos=[];
+let _orcFiltro='all', _orcBusca='';
+
+function filtrarOrcamentos(busca){ _orcBusca=busca.toLowerCase(); rOrcamentos(); }
+function filtrarOrcStatus(el,f){
+  document.querySelectorAll('#pg-orcamento .fb').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on'); _orcFiltro=f; rOrcamentos();
+}
+
+function rOrcamentos(){
+  const el=$('orc-lista'); if(!el) return;
+  let data=[...DB.orcamentos];
+  if(_orcFiltro!=='all') data=data.filter(o=>o.status===_orcFiltro);
+  if(_orcBusca) data=data.filter(o=>(o.cliente+o.titulo).toLowerCase().includes(_orcBusca));
+  set('nb-orc', DB.orcamentos.filter(o=>o.status==='pendente').length);
+
+  if(!data.length){ el.innerHTML=empty('🧾','Nenhum orçamento','Clique em "+ Novo Orçamento" para criar'); return; }
+
+  const statusCor={pendente:'var(--gold)',aprovado:'var(--green)',rejeitado:'var(--red)'};
+  const statusLabel={pendente:'⏳ Pendente',aprovado:'✅ Aprovado',rejeitado:'❌ Rejeitado'};
+
+  el.innerHTML=data.map(o=>{
+    const total=o.itens.reduce((a,it)=>a+(it.qtd*it.preco),0);
+    const desc=o.desconto||0;
+    const totalFinal=total*(1-desc/100);
+    return `<div style="background:var(--s1);border:1px solid var(--bd);border-left:4px solid ${statusCor[o.status]||'var(--gold)'};border-radius:11px;padding:14px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span style="font-size:12px;font-weight:800;color:var(--gold);font-family:var(--M)">#${o.num}</span>
+            <span style="font-size:14px;font-weight:700">${o.titulo||'Orçamento'}</span>
+            <span style="font-size:11px;font-weight:700;color:${statusCor[o.status]};background:${statusCor[o.status]}22;padding:2px 8px;border-radius:20px">${statusLabel[o.status]||o.status}</span>
+          </div>
+          <div style="font-size:12px;color:var(--t2);display:flex;gap:12px;flex-wrap:wrap">
+            <span>👤 <strong>${o.cliente||'—'}</strong></span>
+            <span>📅 ${o.data||'—'}</span>
+            ${o.validade?`<span>⏰ Válido até: ${o.validade}</span>`:''}
+            <span>${o.itens.length} item(s)</span>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:22px;font-weight:900;color:var(--green);font-family:var(--M)">${fmtR(Math.round(totalFinal))}</div>
+          ${desc>0?`<div style="font-size:11px;color:var(--t3)">Desconto: ${desc}% (${fmtR(Math.round(total-totalFinal))})</div>`:''}
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:10px;border-top:1px solid var(--bd);padding-top:9px">
+        <button class="btn bg sm" style="flex:1;justify-content:center" onclick="verOrcamento(${o.id})">👁️ Ver / Editar</button>
+        <button class="btn bgh sm" onclick="gerarPDFOrcamento(${o.id})">📄 PDF</button>
+        ${o.status==='pendente'?`
+          <button class="btn sm" style="background:rgba(0,217,126,.15);color:var(--green);border:1px solid rgba(0,217,126,.3)" onclick="mudarStatusOrc(${o.id},'aprovado')">✅ Aprovar</button>
+          <button class="btn sm" style="background:rgba(255,69,96,.1);color:var(--red);border:1px solid rgba(255,69,96,.3)" onclick="mudarStatusOrc(${o.id},'rejeitado')">❌ Rejeitar</button>
+        `:''}
+        <button class="btn br sm" onclick="delOrcamento(${o.id})">🗑️</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function novoOrcamento(){
+  const empOpts=DB.empresas.length
+    ?'<option value="">— Selecione —</option>'+DB.empresas.map(e=>`<option>${e.nome}</option>`).join('')
+    :'<option value="">— Cadastre clientes primeiro —</option>';
+
+  $('mod-title').innerHTML='🧾 Novo Orçamento';
+  $('mod-body').innerHTML=`
+    <div class="fg2">
+      <div class="fg"><label>Cliente *</label><select class="fc" id="orc-cli">${empOpts}</select></div>
+      <div class="fg"><label>Título</label><input class="fc" id="orc-titulo" placeholder="Ex: Instalação de Câmeras"></div>
+    </div>
+    <div class="fg2">
+      <div class="fg"><label>Data</label><input class="fc" id="orc-data" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+      <div class="fg"><label>Validade</label><input class="fc" id="orc-validade" type="date"></div>
+    </div>
+    <div style="font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin:4px 0 8px">📦 Itens do Orçamento</div>
+    <div id="orc-itens" style="display:flex;flex-direction:column;gap:7px;margin-bottom:8px"></div>
+    <button type="button" class="btn bgh sm" onclick="addItemOrc()">+ Adicionar Item</button>
+    <div class="fg2" style="margin-top:12px">
+      <div class="fg"><label>Desconto (%)</label><input class="fc" id="orc-desc" type="number" min="0" max="100" placeholder="0" oninput="atualizarTotalOrc()"></div>
+      <div class="fg"><label>Condições de Pagamento</label><input class="fc" id="orc-pgto" placeholder="Ex: À vista ou 2x"></div>
+    </div>
+    <div class="fg"><label>Observações</label><textarea class="fc" id="orc-obs" rows="2" placeholder="Informações adicionais..."></textarea></div>
+    <div style="background:var(--s2);border-radius:9px;padding:11px;margin-top:6px;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:13px;font-weight:700;color:var(--t2)">Total do Orçamento</div>
+      <div id="orc-total-preview" style="font-size:22px;font-weight:900;color:var(--green);font-family:var(--M)">R$ 0</div>
+    </div>`;
+
+  // Adiciona 1 item inicial
+  setTimeout(()=>addItemOrc(), 50);
+
+  $('mod-save-btn').onclick=()=>salvarOrcamento();
+  $('MOD').classList.add('open');
+}
+
+function addItemOrc(nome='', qtd=1, preco=0, unid='un'){
+  const lista=$('orc-itens'); if(!lista) return;
+  const id='orc-it-'+Date.now();
+  const div=document.createElement('div');
+  div.id=id;
+  div.style.cssText='display:grid;grid-template-columns:2fr 70px 70px 110px 30px;gap:6px;align-items:center';
+  div.innerHTML=`
+    <input class="fc" placeholder="Descrição do item" value="${nome}" style="font-size:12px;padding:7px 9px" oninput="atualizarTotalOrc()">
+    <input class="fc" type="number" placeholder="Qtd" value="${qtd}" min="1" style="font-size:12px;padding:7px 6px;text-align:center" oninput="atualizarTotalOrc()">
+    <select class="fc" style="font-size:11px;padding:7px 4px">
+      ${['un','m','cm','kg','h','cj','par'].map(u=>`<option${u===unid?' selected':''}>${u}</option>`).join('')}
+    </select>
+    <input class="fc" type="number" placeholder="R$ 0,00" value="${preco||''}" min="0" step="0.01" style="font-size:12px;padding:7px 9px" oninput="atualizarTotalOrc()">
+    <button type="button" onclick="document.getElementById('${id}').remove();atualizarTotalOrc()" style="background:rgba(255,69,96,.15);border:1px solid rgba(255,69,96,.3);color:var(--red);border-radius:7px;padding:5px 7px;cursor:pointer;font-size:12px">✕</button>`;
+  lista.appendChild(div);
+}
+
+function atualizarTotalOrc(){
+  const lista=$('orc-itens'); if(!lista) return;
+  let total=0;
+  lista.querySelectorAll('div[id^="orc-it-"]').forEach(row=>{
+    const inputs=row.querySelectorAll('input');
+    const qtd=parseFloat(inputs[1]?.value)||0;
+    const preco=parseFloat(inputs[3]?.value)||0;
+    total+=qtd*preco;
+  });
+  const desc=parseFloat($('orc-desc')?.value)||0;
+  const totalFinal=total*(1-desc/100);
+  const el=$('orc-total-preview');
+  if(el) el.textContent=fmtR(Math.round(totalFinal));
+}
+
+function salvarOrcamento(){
+  const cli=$('orc-cli')?.value;
+  if(!cli){ toast('⚠️ Selecione o cliente!'); return; }
+  const titulo=($('orc-titulo')?.value||'Orçamento').trim();
+  const data=$('orc-data')?.value||new Date().toISOString().slice(0,10);
+  const validade=$('orc-validade')?.value||'';
+  const desconto=parseFloat($('orc-desc')?.value)||0;
+  const pgto=($('orc-pgto')?.value||'').trim();
+  const obs=($('orc-obs')?.value||'').trim();
+
+  const lista=$('orc-itens'); if(!lista){ toast('⚠️ Adicione ao menos 1 item!'); return; }
+  const itens=[];
+  lista.querySelectorAll('div[id^="orc-it-"]').forEach(row=>{
+    const inputs=row.querySelectorAll('input');
+    const sels=row.querySelectorAll('select');
+    const nome=(inputs[0]?.value||'').trim();
+    const qtd=parseFloat(inputs[1]?.value)||1;
+    const unid=sels[0]?.value||'un';
+    const preco=parseFloat(inputs[3]?.value)||0;
+    if(nome) itens.push({nome,qtd,unid,preco});
+  });
+  if(!itens.length){ toast('⚠️ Adicione ao menos 1 item!'); return; }
+
+  if(!DB.orcamentos) DB.orcamentos=[];
+  const num=String(1000+DB.orcamentos.length+1);
+  const orc={
+    id:uid(), num, cli:cli, titulo, data:new Date(data).toLocaleDateString('pt-BR'),
+    validade:validade?new Date(validade).toLocaleDateString('pt-BR'):'',
+    itens, desconto, pgto, obs, status:'pendente', criadoEm:nowStr()
+  };
+  DB.orcamentos.unshift(orc);
+  adicionarEvento(cli,'orc',`Orçamento criado: #${num} — ${titulo}`,'🧾');
+  DB.notifs.unshift({ic:'🧾',t:`Orçamento #${num}: ${titulo}`,sub:cli,time:nowStr(),tipo:'unread'});
+  rOrcamentos(); rNotifs(); autoSave();
+  M.close(); $('mod-save-btn').onclick=()=>M.save();
+  toast(`✅ Orçamento #${num} criado!`);
+}
+
+function verOrcamento(id){
+  const o=DB.orcamentos.find(x=>x.id===id); if(!o) return;
+  const total=o.itens.reduce((a,it)=>a+(it.qtd*it.preco),0);
+  const desc=o.desconto||0;
+  const totalFinal=total*(1-desc/100);
+  const statusCor={pendente:'var(--gold)',aprovado:'var(--green)',rejeitado:'var(--red)'};
+
+  $('mod-title').innerHTML=`🧾 Orçamento #${o.num}`;
+  $('mod-body').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn bg" onclick="gerarPDFOrcamento(${o.id})">📄 Exportar PDF</button>
+        ${o.status==='pendente'?`
+          <button class="btn sm" style="background:rgba(0,217,126,.15);color:var(--green);border:1px solid rgba(0,217,126,.3)" onclick="mudarStatusOrc(${o.id},'aprovado');$('MOD').classList.remove('open')">✅ Aprovar</button>
+          <button class="btn sm" style="background:rgba(255,69,96,.1);color:var(--red);border:1px solid rgba(255,69,96,.3)" onclick="mudarStatusOrc(${o.id},'rejeitado');$('MOD').classList.remove('open')">❌ Rejeitar</button>
+        `:''}
+      </div>
+      <div style="background:var(--s2);border-radius:10px;padding:12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
+          <div><div style="color:var(--t3);font-size:10px">Cliente</div><div style="font-weight:700">${o.cli}</div></div>
+          <div><div style="color:var(--t3);font-size:10px">Título</div><div style="font-weight:700">${o.titulo}</div></div>
+          <div><div style="color:var(--t3);font-size:10px">Data</div><div style="font-weight:700">${o.data}</div></div>
+          <div><div style="color:var(--t3);font-size:10px">Validade</div><div style="font-weight:700">${o.validade||'—'}</div></div>
+          <div><div style="color:var(--t3);font-size:10px">Pagamento</div><div style="font-weight:700">${o.pgto||'—'}</div></div>
+          <div><div style="color:var(--t3);font-size:10px">Status</div><div style="font-weight:700;color:${statusCor[o.status]}">${o.status}</div></div>
+        </div>
+      </div>
+      <div style="background:var(--s2);border-radius:10px;padding:12px">
+        <div style="font-size:10px;font-weight:800;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:9px">📦 Itens</div>
+        <div style="display:grid;grid-template-columns:2fr 60px 60px 90px;gap:6px;font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid var(--bd)">
+          <span>Descrição</span><span style="text-align:center">Qtd</span><span style="text-align:center">Un</span><span style="text-align:right">Valor</span>
+        </div>
+        ${o.itens.map(it=>`<div style="display:grid;grid-template-columns:2fr 60px 60px 90px;gap:6px;font-size:12px;padding:5px 0;border-bottom:1px solid rgba(28,48,80,.3)">
+          <span>${it.nome}</span>
+          <span style="text-align:center;color:var(--gold);font-weight:700">${it.qtd}</span>
+          <span style="text-align:center;color:var(--t3)">${it.unid}</span>
+          <span style="text-align:right;font-weight:700;font-family:var(--M)">${fmtR(it.qtd*it.preco)}</span>
+        </div>`).join('')}
+        <div style="display:flex;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid var(--bd)">
+          <span style="font-size:12px;color:var(--t2)">Subtotal</span>
+          <span style="font-family:var(--M);font-weight:700">${fmtR(Math.round(total))}</span>
+        </div>
+        ${desc>0?`<div style="display:flex;justify-content:space-between;margin-top:4px">
+          <span style="font-size:12px;color:var(--red)">Desconto (${desc}%)</span>
+          <span style="font-family:var(--M);color:var(--red);font-weight:700">- ${fmtR(Math.round(total-totalFinal))}</span>
+        </div>`:''}
+        <div style="display:flex;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:2px solid var(--gold)">
+          <span style="font-size:14px;font-weight:800">Total</span>
+          <span style="font-size:22px;font-weight:900;color:var(--green);font-family:var(--M)">${fmtR(Math.round(totalFinal))}</span>
+        </div>
+      </div>
+      ${o.obs?`<div style="background:var(--s2);border-radius:10px;padding:12px">
+        <div style="font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">📝 Observações</div>
+        <div style="font-size:12px;color:var(--t2);line-height:1.6">${o.obs}</div>
+      </div>`:''}
+    </div>`;
+
+  const btn=$('mod-save-btn'); if(btn) btn.style.display='none';
+  $('MOD').classList.add('open');
+  $('MOD').onclick=ev=>{ if(ev.target===$('MOD')){ const b=$('mod-save-btn');if(b)b.style.display='';$('MOD').onclick=null;$('MOD').classList.remove('open'); } };
+}
+
+function mudarStatusOrc(id, status){
+  const o=DB.orcamentos.find(x=>x.id===id); if(!o) return;
+  o.status=status;
+  if(status==='aprovado'){
+    // Lança no pipeline automaticamente
+    const cor=avc(DB.deals.length);
+    const total=o.itens.reduce((a,it)=>a+(it.qtd*it.preco),0);
+    const desc=o.desconto||0;
+    const totalFinal=Math.round(total*(1-desc/100));
+    DB.deals.push({id:uid(),emp:o.cli,val:String(totalFinal),tag:'sv',stage:2,ini:(CU?.nome||'AD').substring(0,2).toUpperCase(),cor});
+    toast(`✅ Orçamento aprovado! Venda adicionada ao Pipeline — ${fmtR(totalFinal)}`);
+    adicionarEvento(o.cli,'venda',`Orçamento #${o.num} aprovado e adicionado ao Pipeline — ${fmtR(totalFinal)}`,'✅');
+    rPipeline(); updKPI();
+  } else {
+    toast(`❌ Orçamento #${o.num} rejeitado.`);
+  }
+  rOrcamentos(); autoSave();
+}
+
+function delOrcamento(id){
+  if(!confirm('Remover orçamento?')) return;
+  DB.orcamentos=DB.orcamentos.filter(x=>x.id!==id);
+  rOrcamentos(); autoSave(); toast('Orçamento removido!');
+}
+
+function gerarPDFOrcamento(id){
+  const o=DB.orcamentos.find(x=>x.id===id); if(!o){toast('Orçamento não encontrado!');return;}
+  try{
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const PW=210,M=15;
+    let y=0;
+
+    // Cabeçalho
+    doc.setFillColor(245,166,35); doc.rect(0,0,PW,38,'F');
+    doc.setTextColor(0,0,0);
+    doc.setFontSize(20); doc.setFont('helvetica','bold');
+    doc.text('ORÇAMENTO',M,14);
+    doc.setFontSize(10); doc.setFont('helvetica','normal');
+    doc.text(`#${o.num} — ${o.titulo}`,M,22);
+    doc.text(`Data: ${o.data}${o.validade?' | Válido até: '+o.validade:''}`,M,30);
+    doc.setTextColor(245,166,35);
+    doc.text(`Grupo Aliança Monitoramento`,PW-M-70,30);
+    y=48;
+
+    // Cliente
+    doc.setFillColor(19,29,47); doc.rect(M,y,PW-2*M,7,'F');
+    doc.setTextColor(245,166,35); doc.setFontSize(9); doc.setFont('helvetica','bold');
+    doc.text('CLIENTE',M+3,y+5); y+=11;
+    doc.setTextColor(220,235,255); doc.setFontSize(10); doc.setFont('helvetica','bold');
+    doc.text(o.cli,M+3,y); y+=8;
+
+    // Itens
+    doc.setFillColor(19,29,47); doc.rect(M,y,PW-2*M,7,'F');
+    doc.setTextColor(245,166,35); doc.setFontSize(9); doc.setFont('helvetica','bold');
+    doc.text('ITENS DO ORÇAMENTO',M+3,y+5); y+=11;
+
+    // Header tabela
+    doc.setFillColor(12,22,40); doc.rect(M,y-5,PW-2*M,8,'F');
+    doc.setTextColor(150,170,200); doc.setFontSize(8);
+    doc.text('DESCRIÇÃO',M+3,y);
+    doc.text('QTD',M+110,y);
+    doc.text('UN',M+128,y);
+    doc.text('UNIT.',M+143,y);
+    doc.text('TOTAL',M+162,y);
+    y+=7;
+
+    let subtotal=0;
+    o.itens.forEach((it,i)=>{
+      const rowTotal=it.qtd*it.preco;
+      subtotal+=rowTotal;
+      doc.setFillColor(i%2===0?18:15,i%2===0?30:25,i%2===0?50:42);
+      doc.rect(M,y-5,PW-2*M,8,'F');
+      doc.setTextColor(220,235,255); doc.setFontSize(9); doc.setFont('helvetica','normal');
+      const nome=it.nome.substring(0,45);
+      doc.text(nome,M+3,y);
+      doc.setFont('helvetica','bold'); doc.setTextColor(245,166,35);
+      doc.text(String(it.qtd),M+112,y);
+      doc.setTextColor(150,170,200); doc.setFont('helvetica','normal');
+      doc.text(it.unid||'un',M+129,y);
+      doc.setTextColor(220,235,255);
+      doc.text('R$'+it.preco.toFixed(2).replace('.',','),M+138,y);
+      doc.setFont('helvetica','bold'); doc.setTextColor(0,217,126);
+      doc.text('R$'+rowTotal.toFixed(2).replace('.',','),M+157,y);
+      y+=10;
+    });
+
+    y+=4;
+    const desc=o.desconto||0;
+    const totalFinal=subtotal*(1-desc/100);
+
+    // Totais
+    doc.setFillColor(19,29,47); doc.rect(M,y,PW-2*M,desc>0?28:20,'F');
+    y+=7;
+    doc.setTextColor(150,170,200); doc.setFontSize(9); doc.setFont('helvetica','normal');
+    doc.text('Subtotal:',PW-M-50,y);
+    doc.setTextColor(220,235,255); doc.setFont('helvetica','bold');
+    doc.text(`R$ ${subtotal.toFixed(2).replace('.',',')}`,PW-M-15,y,{align:'right'});
+    y+=7;
+    if(desc>0){
+      doc.setTextColor(255,100,100); doc.setFont('helvetica','normal');
+      doc.text(`Desconto (${desc}%):`,PW-M-50,y);
+      doc.setFont('helvetica','bold');
+      doc.text(`- R$ ${(subtotal-totalFinal).toFixed(2).replace('.',',')}`,PW-M-15,y,{align:'right'});
+      y+=7;
+    }
+    doc.setFillColor(245,166,35); doc.rect(M,y-5,PW-2*M,10,'F');
+    doc.setTextColor(0,0,0); doc.setFontSize(11); doc.setFont('helvetica','bold');
+    doc.text('TOTAL:',PW-M-50,y+1);
+    doc.text(`R$ ${totalFinal.toFixed(2).replace('.',',')}`,PW-M-3,y+1,{align:'right'});
+    y+=16;
+
+    // Pagamento e obs
+    if(o.pgto){
+      doc.setTextColor(220,235,255); doc.setFontSize(9); doc.setFont('helvetica','normal');
+      doc.text(`Condições de pagamento: ${o.pgto}`,M,y); y+=8;
+    }
+    if(o.obs){
+      doc.setFillColor(19,29,47); doc.rect(M,y,PW-2*M,6,'F');
+      doc.setTextColor(245,166,35); doc.setFontSize(9); doc.setFont('helvetica','bold');
+      doc.text('OBSERVAÇÕES',M+3,y+4); y+=10;
+      doc.setTextColor(220,235,255); doc.setFont('helvetica','normal');
+      const linhas=doc.splitTextToSize(o.obs,PW-2*M-6);
+      doc.text(linhas,M+3,y); y+=linhas.length*5+5;
+    }
+
+    // Assinatura
+    y=Math.max(y,250);
+    doc.setDrawColor(245,166,35); doc.setLineWidth(0.3);
+    doc.line(M,y,M+80,y); doc.line(PW-M-80,y,PW-M,y);
+    doc.setTextColor(150,170,200); doc.setFontSize(8);
+    doc.text('Assinatura da Empresa',M+5,y+5);
+    doc.text('Assinatura do Cliente',PW-M-75,y+5);
+
+    // Rodapé
+    doc.setFillColor(245,166,35); doc.rect(0,285,PW,12,'F');
+    doc.setTextColor(0,0,0); doc.setFontSize(8); doc.setFont('helvetica','normal');
+    doc.text('Grupo Aliança Monitoramento · Segurança Eletrônica Profissional',M,292);
+    doc.text(`Orçamento #${o.num} · ${o.data}`,PW-M-40,292,{align:'right'});
+
+    doc.save(`Orcamento_${o.num}_${o.cli.replace(/\s/g,'_')}.pdf`);
+    toast('✅ PDF do orçamento gerado!');
+  }catch(e){ toast('❌ Erro ao gerar PDF: '+e.message); console.error(e); }
+
+}
+
 function popularHistoricoSel(){
   const sel=$('hist-cliente-sel'); if(!sel) return;
   sel.innerHTML='<option value="">— Selecione um cliente —</option>'
@@ -6513,13 +6903,14 @@ function popularHistoricoSel(){
 }
 
 function initApp(){
-  if(!DB.equips)    DB.equips={};
-  if(!DB.feedbacks) DB.feedbacks={};
-  if(!DB.lembretes) DB.lembretes=[];
-  if(!DB.rascunhos) DB.rascunhos=[];
-  if(!DB.emailTpls) DB.emailTpls=[];
-  if(!DB.propostas) DB.propostas=[];
-  if(!DB.historico) DB.historico={};
+  if(!DB.equips)      DB.equips={};
+  if(!DB.feedbacks)   DB.feedbacks={};
+  if(!DB.lembretes)   DB.lembretes=[];
+  if(!DB.rascunhos)   DB.rascunhos=[];
+  if(!DB.emailTpls)   DB.emailTpls=[];
+  if(!DB.propostas)   DB.propostas=[];
+  if(!DB.orcamentos)  DB.orcamentos=[];
+  if(!DB.historico)   DB.historico={};
   if(!DB.autoMsg)   DB.autoMsg={ativo:true,wa:true,email:true,msgWA:`Olá {nome}! 🎉\n\nSua execução foi aprovada! Em breve entraremos em contato para agendar.\n\nAtenciosamente,\nAliance CRM 🛡️`,msgEmail:`Prezado(a) {nome},\n\nConfirmamos a aprovação do seu contrato!\n\nNosso técnico entrará em contato em breve.\n\nAtenciosamente,\nAliance CRM`,assuntoEmail:'🏆 Bem-vindo ao Aliance CRM!'};
   if(!DB.adminCfg)  DB.adminCfg={osTipos:['Atendimento','Visita','Execução','Entrega','Suporte','Consultoria'],servicos:[{key:'sv',label:'🔧 Serviço',cor:'#0057FF'},{key:'pr',label:'📦 Produto',cor:'#8b5cf6'},{key:'co',label:'📋 Consultoria',cor:'#f59e0b'},{key:'mn',label:'🔄 Manutenção',cor:'#00C48C'},{key:'ou',label:'⭐ Outro',cor:'#ef4444'}],status:[{key:'at',label:'Ativo',cor:'#00d97e'},{key:'pr',label:'Proposta',cor:'#f5a623'},{key:'ng',label:'Negociação',cor:'#ff8c42'},{key:'pd',label:'Atraso',cor:'#ff4560'},{key:'vt',label:'Em andamento',cor:'#3d9bff'}],segmentos:['Condomínio','Comércio','Indústria','Saúde','Educação','Financeiro','Residencial','Outro'],camposExtras:[]};
 
