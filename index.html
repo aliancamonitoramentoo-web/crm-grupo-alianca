@@ -2549,9 +2549,17 @@ function rEquipe(){
     const tecObj=DB.tecnicos.find(t=>(typeof t==='string'?t:t.nome)===nome);
     const sal=typeof tecObj==='object'?tecObj.salario||0:0;
     const diaria=typeof tecObj==='object'?tecObj.diaria||0:0;
-    // Custo por OS = diária cadastrada OU salário/dias úteis
     const custoPorOS=diaria>0?diaria:(sal>0?Math.round(sal/diasUteis):0);
-    // Total de OS feitas (abertas + concluídas = tudo que o técnico trabalhou)
+
+    // Define osDoTec aqui — OS onde este técnico está listado
+    const osDoTec=DB.os.filter(o=>{
+      if(!o.tec&&!o.tecs) return false;
+      const tecStr=(o.tec||'').split(',').map(s=>s.trim().toLowerCase());
+      if(tecStr.includes(nome.toLowerCase())) return true;
+      if(o.tecs&&Array.isArray(o.tecs)) return o.tecs.some(t=>(t.nome||t||'').toLowerCase()===nome.toLowerCase());
+      return false;
+    });
+
     const totalRec=osDoTec.reduce((a,o)=>a+(o.valPorTec||o.valor||0),0);
     const custoTotal=custoPorOS*osDoTec.length;
     const totalLuc=totalRec-custoTotal;
