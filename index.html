@@ -1367,6 +1367,7 @@ function go(id,el){
   abrirGrupoDoItem(id);
   if(id==='email')    setTimeout(rEmailPage,100);
   if(id==='admin')    setTimeout(rAdminPanel,100);
+  if(id==='usuarios') setTimeout(rUsuarios,100);
   if(id==='proposta')  setTimeout(rPropostas,100);
   if(id==='orcamento') setTimeout(rOrcamentos,100);
   if(id==='historico'){ setTimeout(()=>{popularHistoricoSel();rHistorico(_histCliente);},100); }
@@ -2702,18 +2703,19 @@ function editUser(id,field,val){
   u[field]=val.trim();
   if(field==='nome')u.ini=val.trim().substring(0,2).toUpperCase();
   if(CU&&CU.id===id){CU=u;applyProfile();}
-  toast(`✅ ${u.nome} atualizado!`);
+  autoSave();toast(`✅ ${u.nome} atualizado!`);
 }
 function togglePerfil(id){
   const u=USERS.find(x=>x.id===id);if(!u)return;
   if(CU&&CU.id===id){toast('⛔ Não pode alterar o próprio perfil!');return;}
-  u.perfil=u.perfil==='admin'?'normal':'admin';rUsuarios();toast(`Perfil de ${u.nome} → ${u.perfil.toUpperCase()}`);
+  u.perfil=u.perfil==='admin'?'normal':'admin';
+  rUsuarios();autoSave();toast(`Perfil de ${u.nome} → ${u.perfil.toUpperCase()}`);
 }
 function removeUser(id){
   if(CU&&CU.id===id){toast('⛔ Não pode remover a própria conta!');return;}
   if(!confirm('Remover conta?'))return;
   const i=USERS.findIndex(x=>x.id===id);if(i>=0)USERS.splice(i,1);
-  rUsuarios();toast('Conta removida!');
+  rUsuarios();autoSave();toast('Conta removida!');
 }
 
 // ── CONFIGURAÇÕES ─────────────────────────
@@ -3382,12 +3384,16 @@ const M={
 
     }else if(_mtype==='usuario'){
       const nome=gv('f0');if(!nome){toast('⚠️ Informe o nome!');return;}
-      const perfil=gv('f1')||'normal',login=gv('f2').toLowerCase(),senha=gv('f3');
+      const perfil=gv('f1')||'normal';
+      const login=(gv('f2')||'').toLowerCase().trim();
+      const senha=gv('f3')||'';
       if(!login){toast('⚠️ Informe o login!');return;}
       if(senha.length<4){toast('⚠️ Senha curta! Mín. 4 caracteres.');return;}
       if(USERS.find(u=>u.login===login)){toast('⚠️ Login já existe!');return;}
-      USERS.push({id:uid(),nome,login,senha,perfil,cor,ini:nome.substring(0,2).toUpperCase()});
-      rUsuarios();M.close();toast(`✅ Conta "${nome}" criada! Login: ${login}`);return;
+      const cores=['#f5a623','#3d9bff','#00d97e','#b08fff','#ff8c42','#ff4560'];
+      const corNova=cores[USERS.length%cores.length];
+      USERS.push({id:uid(),nome,login,senha,perfil,cor:corNova,ini:nome.substring(0,2).toUpperCase()});
+      rUsuarios();autoSave();M.close();toast(`✅ Conta "${nome}" criada! Login: ${login}`);return;
 
     }else if(_mtype==='mov'){
       const tipo=gv('f0'),valRaw=gv('f1');
