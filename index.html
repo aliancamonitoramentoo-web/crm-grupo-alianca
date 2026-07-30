@@ -2058,7 +2058,7 @@ function gerarPDFOS(id){
     let y=0;
 
     // ── Header ──
-    doc.setFillColor(6,16,30); doc.rect(0,0,PW,297,'F');
+    doc.setFillColor(255,255,255); doc.rect(0,0,PW,297,'F');
     doc.setFillColor(245,166,35); doc.rect(0,0,PW,38,'F');
     doc.setTextColor(0,0,0);
     doc.setFontSize(18); doc.setFont('helvetica','bold');
@@ -2074,14 +2074,14 @@ function gerarPDFOS(id){
 
     const secao=(titulo,cor=[19,29,47])=>{
       doc.setFillColor(...cor); doc.rect(M,y,PW-2*M,7,'F');
-      doc.setTextColor(245,166,35); doc.setFontSize(9); doc.setFont('helvetica','bold');
+      doc.setTextColor(0,0,0); doc.setFontSize(9); doc.setFont('helvetica','bold');
       doc.text(titulo,M+3,y+5); y+=11;
     };
 
     const campo=(label,valor,x,largura)=>{
-      doc.setTextColor(150,170,200); doc.setFontSize(8); doc.setFont('helvetica','normal');
+      doc.setTextColor(80,80,80); doc.setFontSize(8); doc.setFont('helvetica','normal');
       doc.text(label,x,y);
-      doc.setTextColor(220,235,255); doc.setFontSize(9.5); doc.setFont('helvetica','bold');
+      doc.setTextColor(30,30,30); doc.setFontSize(9.5); doc.setFont('helvetica','bold');
       const linhas=doc.splitTextToSize(valor||'—',largura-4);
       doc.text(linhas,x,y+5);
       return linhas.length*4.5+2;
@@ -2114,18 +2114,18 @@ function gerarPDFOS(id){
     if(o.materiais?.length){
       secao('MATERIAIS / EQUIPAMENTOS UTILIZADOS');
       // Header tabela
-      doc.setFillColor(19,29,47); doc.rect(M,y,PW-2*M,7,'F');
+      doc.setFillColor(240,240,240); doc.rect(M,y,PW-2*M,7,'F');
       doc.setTextColor(245,166,35); doc.setFontSize(8); doc.setFont('helvetica','bold');
       doc.text('MATERIAL',M+3,y+5); doc.text('QTD',M+130,y+5); doc.text('UN',M+155,y+5);
       y+=10;
       o.materiais.forEach((m,i)=>{
-        doc.setFillColor(i%2===0?18:15, i%2===0?30:25, i%2===0?50:42);
+        doc.setFillColor(i%2===0?248:255, i%2===0?248:255, i%2===0?248:255);
         doc.rect(M,y-5,PW-2*M,8,'F');
-        doc.setTextColor(220,235,255); doc.setFontSize(9); doc.setFont('helvetica','normal');
+        doc.setTextColor(30,30,30); doc.setFontSize(9); doc.setFont('helvetica','normal');
         doc.text(m.nome.substring(0,50),M+3,y);
         doc.setFont('helvetica','bold'); doc.setTextColor(245,166,35);
         doc.text(String(m.qtd),M+132,y);
-        doc.setTextColor(150,170,200); doc.setFont('helvetica','normal');
+        doc.setTextColor(80,80,80); doc.setFont('helvetica','normal');
         doc.text(m.unid||'un',M+157,y);
         y+=10;
       });
@@ -2135,7 +2135,7 @@ function gerarPDFOS(id){
     // ── Descrição ──
     if(o.desc){
       secao('DESCRIÇÃO DO SERVIÇO');
-      doc.setTextColor(220,235,255); doc.setFontSize(9); doc.setFont('helvetica','normal');
+      doc.setTextColor(30,30,30); doc.setFontSize(9); doc.setFont('helvetica','normal');
       const linhas=doc.splitTextToSize(o.desc,PW-2*M-6);
       doc.text(linhas,M+3,y); y+=linhas.length*5+8;
     }
@@ -2143,7 +2143,7 @@ function gerarPDFOS(id){
     // ── Diagnóstico ──
     if(o.diag){
       secao('DIAGNÓSTICO',[30,15,5]);
-      doc.setTextColor(220,235,255); doc.setFontSize(9); doc.setFont('helvetica','normal');
+      doc.setTextColor(30,30,30); doc.setFontSize(9); doc.setFont('helvetica','normal');
       const linhas=doc.splitTextToSize(o.diag,PW-2*M-6);
       doc.text(linhas,M+3,y); y+=linhas.length*5+8;
     }
@@ -2151,7 +2151,7 @@ function gerarPDFOS(id){
     // ── Solução ──
     if(o.soluc){
       secao('SOLUÇÃO APLICADA',[5,30,15]);
-      doc.setTextColor(220,235,255); doc.setFontSize(9); doc.setFont('helvetica','normal');
+      doc.setTextColor(30,30,30); doc.setFontSize(9); doc.setFont('helvetica','normal');
       const linhas=doc.splitTextToSize(o.soluc,PW-2*M-6);
       doc.text(linhas,M+3,y); y+=linhas.length*5+8;
     }
@@ -2160,7 +2160,7 @@ function gerarPDFOS(id){
     y=Math.max(y,240);
     doc.setDrawColor(245,166,35); doc.setLineWidth(0.3);
     doc.line(M,y,M+80,y); doc.line(PW-M-80,y,PW-M,y);
-    doc.setTextColor(150,170,200); doc.setFontSize(8);
+    doc.setTextColor(80,80,80); doc.setFontSize(8);
     doc.text('Assinatura do Técnico',M+5,y+5);
     doc.text('Assinatura do Cliente',PW-M-75,y+5);
 
@@ -5470,13 +5470,13 @@ function gerarPDF(idx){
     // Linhas dos itens
     let y=102;
     p.itens.forEach((it,i)=>{
-      doc.setFillColor(i%2===0?18:15, i%2===0?30:25, i%2===0?50:42);
+      doc.setFillColor(i%2===0?248:255, i%2===0?248:255, i%2===0?248:255);
       doc.rect(M,y-5,PW-2*M,8,'F');
-      doc.setTextColor(220,235,255); doc.setFontSize(9); doc.setFont('helvetica','normal');
+      doc.setTextColor(30,30,30); doc.setFontSize(9); doc.setFont('helvetica','normal');
       doc.text(it.desc.substring(0,45),M+2,y);
       doc.text(String(it.qtd),M+102,y);
       doc.text(fmtR(it.preco),M+118,y);
-      doc.setFont('helvetica','bold'); doc.setTextColor(0,217,126);
+      doc.setFont('helvetica','bold'); doc.setTextColor(30,30,30);
       doc.text(fmtR(it.qtd*it.preco),M+153,y);
       y+=10;
     });
@@ -6811,20 +6811,20 @@ function gerarPDFOrcamento(id){
     y=48;
 
     // Cliente
-    doc.setFillColor(19,29,47); doc.rect(M,y,PW-2*M,7,'F');
+    doc.setFillColor(240,240,240); doc.rect(M,y,PW-2*M,7,'F');
     doc.setTextColor(245,166,35); doc.setFontSize(9); doc.setFont('helvetica','bold');
     doc.text('CLIENTE',M+3,y+5); y+=11;
-    doc.setTextColor(220,235,255); doc.setFontSize(10); doc.setFont('helvetica','bold');
+    doc.setTextColor(30,30,30); doc.setFontSize(10); doc.setFont('helvetica','bold');
     doc.text(o.cli,M+3,y); y+=8;
 
     // Itens
-    doc.setFillColor(19,29,47); doc.rect(M,y,PW-2*M,7,'F');
+    doc.setFillColor(240,240,240); doc.rect(M,y,PW-2*M,7,'F');
     doc.setTextColor(245,166,35); doc.setFontSize(9); doc.setFont('helvetica','bold');
     doc.text('ITENS DO ORÇAMENTO',M+3,y+5); y+=11;
 
     // Header tabela
-    doc.setFillColor(12,22,40); doc.rect(M,y-5,PW-2*M,8,'F');
-    doc.setTextColor(150,170,200); doc.setFontSize(8);
+    doc.setFillColor(220,220,220); doc.rect(M,y-5,PW-2*M,8,'F');
+    doc.setTextColor(80,80,80); doc.setFontSize(8);
     doc.text('DESCRIÇÃO',M+3,y);
     doc.text('QTD',M+110,y);
     doc.text('UN',M+128,y);
@@ -6836,18 +6836,18 @@ function gerarPDFOrcamento(id){
     o.itens.forEach((it,i)=>{
       const rowTotal=it.qtd*it.preco;
       subtotal+=rowTotal;
-      doc.setFillColor(i%2===0?18:15,i%2===0?30:25,i%2===0?50:42);
+      doc.setFillColor(i%2===0?248:255,i%2===0?248:255,i%2===0?248:255);
       doc.rect(M,y-5,PW-2*M,8,'F');
-      doc.setTextColor(220,235,255); doc.setFontSize(9); doc.setFont('helvetica','normal');
+      doc.setTextColor(30,30,30); doc.setFontSize(9); doc.setFont('helvetica','normal');
       const nome=it.nome.substring(0,45);
       doc.text(nome,M+3,y);
       doc.setFont('helvetica','bold'); doc.setTextColor(245,166,35);
       doc.text(String(it.qtd),M+112,y);
-      doc.setTextColor(150,170,200); doc.setFont('helvetica','normal');
+      doc.setTextColor(80,80,80); doc.setFont('helvetica','normal');
       doc.text(it.unid||'un',M+129,y);
-      doc.setTextColor(220,235,255);
+      doc.setTextColor(30,30,30);
       doc.text('R$'+it.preco.toFixed(2).replace('.',','),M+138,y);
-      doc.setFont('helvetica','bold'); doc.setTextColor(0,217,126);
+      doc.setFont('helvetica','bold'); doc.setTextColor(30,30,30);
       doc.text('R$'+rowTotal.toFixed(2).replace('.',','),M+157,y);
       y+=10;
     });
@@ -6859,9 +6859,9 @@ function gerarPDFOrcamento(id){
     // Totais
     doc.setFillColor(19,29,47); doc.rect(M,y,PW-2*M,desc>0?28:20,'F');
     y+=7;
-    doc.setTextColor(150,170,200); doc.setFontSize(9); doc.setFont('helvetica','normal');
+    doc.setTextColor(80,80,80); doc.setFontSize(9); doc.setFont('helvetica','normal');
     doc.text('Subtotal:',PW-M-50,y);
-    doc.setTextColor(220,235,255); doc.setFont('helvetica','bold');
+    doc.setTextColor(30,30,30); doc.setFont('helvetica','bold');
     doc.text(`R$ ${subtotal.toFixed(2).replace('.',',')}`,PW-M-15,y,{align:'right'});
     y+=7;
     if(desc>0){
@@ -6879,14 +6879,14 @@ function gerarPDFOrcamento(id){
 
     // Pagamento e obs
     if(o.pgto){
-      doc.setTextColor(220,235,255); doc.setFontSize(9); doc.setFont('helvetica','normal');
+      doc.setTextColor(30,30,30); doc.setFontSize(9); doc.setFont('helvetica','normal');
       doc.text(`Condições de pagamento: ${o.pgto}`,M,y); y+=8;
     }
     if(o.obs){
       doc.setFillColor(19,29,47); doc.rect(M,y,PW-2*M,6,'F');
       doc.setTextColor(245,166,35); doc.setFontSize(9); doc.setFont('helvetica','bold');
       doc.text('OBSERVAÇÕES',M+3,y+4); y+=10;
-      doc.setTextColor(220,235,255); doc.setFont('helvetica','normal');
+      doc.setTextColor(30,30,30); doc.setFont('helvetica','normal');
       const linhas=doc.splitTextToSize(o.obs,PW-2*M-6);
       doc.text(linhas,M+3,y); y+=linhas.length*5+5;
     }
@@ -6895,7 +6895,7 @@ function gerarPDFOrcamento(id){
     y=Math.max(y,250);
     doc.setDrawColor(245,166,35); doc.setLineWidth(0.3);
     doc.line(M,y,M+80,y); doc.line(PW-M-80,y,PW-M,y);
-    doc.setTextColor(150,170,200); doc.setFontSize(8);
+    doc.setTextColor(80,80,80); doc.setFontSize(8);
     doc.text('Assinatura da Empresa',M+5,y+5);
     doc.text('Assinatura do Cliente',PW-M-75,y+5);
 
