@@ -3010,7 +3010,7 @@ const MFRM={
   </div>
 
   <!-- Bloco de venda (oculto por padrão) -->
-  <div id="cli-venda-bloco" style="display:none;background:var(--s2);border-radius:11px;padding:13px;display:none;flex-direction:column;gap:10px">
+  <div id="cli-venda-bloco" style="display:none;background:var(--s2);border-radius:11px;padding:13px;flex-direction:column;gap:10px">
     <div style="font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1px">🔥 Oportunidade de Venda</div>
     <div class="fg" style="margin:0"><label>Serviço de Interesse</label>
       <select class="fc" id="cli-tag">
@@ -3220,7 +3220,7 @@ const M={
     const btn=$('mod-save-btn'); if(btn) btn.style.display='';
   },
   save(){
-    if(!isAdmin()&&!['agenda','contato'].includes(_mtype)){toast('⛔ Sem permissão!');return;}
+    if(!isAdmin()&&!['agenda','contato','cliente'].includes(_mtype)){toast('⛔ Sem permissão!');return;}
     const gv=id=>{const e=$(id);return e?e.value.trim():'';};
     const AVC2=['#f5a623','#b08fff','#00d97e','#ff8c42','#ff4560','#3d9bff'];
     const cor=AVC2[Math.floor(Math.random()*AVC2.length)];
