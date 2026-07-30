@@ -6653,9 +6653,9 @@ function atualizarTotalOrc(){
   const lista=$('orc-itens'); if(!lista) return;
   let total=0;
   lista.querySelectorAll('div[id^="orc-it-"]').forEach(row=>{
-    const inputs=row.querySelectorAll('input');
-    const qtd=parseFloat(inputs[1]?.value)||0;
-    const preco=parseFloat(inputs[3]?.value)||0;
+    const inputs=row.querySelectorAll('input[type="number"]');
+    const qtd=parseFloat(inputs[0]?.value)||0;
+    const preco=parseFloat(inputs[1]?.value)||0;
     total+=qtd*preco;
   });
   const desc=parseFloat($('orc-desc')?.value)||0;
@@ -6677,12 +6677,13 @@ function salvarOrcamento(){
   const lista=$('orc-itens'); if(!lista){ toast('⚠️ Adicione ao menos 1 item!'); return; }
   const itens=[];
   lista.querySelectorAll('div[id^="orc-it-"]').forEach(row=>{
-    const inputs=row.querySelectorAll('input');
+    const inputs=row.querySelectorAll('input[type="number"]');
     const sels=row.querySelectorAll('select');
-    const nome=(inputs[0]?.value||'').trim();
-    const qtd=parseFloat(inputs[1]?.value)||1;
+    const nomeInput=row.querySelector('input:not([type="number"])');
+    const nome=(nomeInput?.value||'').trim();
+    const qtd=parseFloat(inputs[0]?.value)||1;
     const unid=sels[0]?.value||'un';
-    const preco=parseFloat(inputs[3]?.value)||0;
+    const preco=parseFloat(inputs[1]?.value)||0;
     if(nome) itens.push({nome,qtd,unid,preco});
   });
   if(!itens.length){ toast('⚠️ Adicione ao menos 1 item!'); return; }
