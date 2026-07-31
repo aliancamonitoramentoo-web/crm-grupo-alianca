@@ -1,66 +1,44 @@
 const express = require('express');
 const path    = require('path');
-const https   = require('https');
+const fs      = require('fs');
 const app     = express();
 const PORT    = process.env.PORT || 3000;
 
 app.use(express.json({limit:'10mb'}));
 app.use(express.static(path.join(__dirname)));
 
-// ── Proxy JSONBin — resolve CORS e 401 ──────────
-app.get('/jb/:bin', (req, res) => {
-  const key = req.headers['x-jb-key'] || req.headers['x-master-key'] || '';
-  const bin = req.params.bin;
-  if (!key || !bin) return res.status(400).json({ error: 'missing key or bin' });
+// Arquivo de dados no servidor
+const DATA_FILE = path.join('/tmp', 'crm_data.json');
 
-  const options = {
-    hostname: 'api.jsonbin.io',
-    path: `/v3/b/${bin}/latest`,
-    method: 'GET',
-    headers: {
-      'X-Master-Key': key,
-      'Content-Type': 'application/json'
+function lerDados(){
+  try{
+    if(fs.existsSync(DATA_FILE)){
+      return JSON.parse(fs.readFileSync(DATA_FILE,'utf8'));
     }
-  };
-  const r = https.request(options, resp => {
-    let data = '';
-    resp.on('data', c => data += c);
-    resp.on('end', () => {
-      try { res.status(resp.statusCode).json(JSON.parse(data)); }
-      catch (e) { res.status(500).json({ error: e.message }); }
-    });
-  });
-  r.on('error', e => res.status(500).json({ error: e.message }));
-  r.end();
+  }catch(e){ console.error('Erro ao ler dados:',e.message); }
+  return null;
+}
+
+function salvarDados(data){
+  try{
+    fs.writeFileSync(DATA_FILE, JSON.stringify(data), 'utf8');
+    return true;
+  }catch(e){ console.error('Erro ao salvar:',e.message); return false; }
+}
+
+// ── Sincronização — GET (recebe dados do servidor) ──
+app.get('/sync', (req, res) => {
+  const dados = lerDados();
+  if(!dados) return res.json({ok:false, empty:true});
+  res.json({ok:true, data:dados});
 });
 
-app.put('/jb/:bin', (req, res) => {
-  const key = req.headers['x-jb-key'] || req.headers['x-master-key'] || '';
-  const bin = req.params.bin;
-  if (!key || !bin) return res.status(400).json({ error: 'missing key or bin' });
-
-  const body = JSON.stringify(req.body);
-  const options = {
-    hostname: 'api.jsonbin.io',
-    path: `/v3/b/${bin}`,
-    method: 'PUT',
-    headers: {
-      'X-Master-Key': key,
-      'Content-Type': 'application/json',
-      'Content-Length': Buffer.byteLength(body)
-    }
-  };
-  const r = https.request(options, resp => {
-    let data = '';
-    resp.on('data', c => data += c);
-    resp.on('end', () => {
-      try { res.status(resp.statusCode).json(JSON.parse(data)); }
-      catch (e) { res.status(500).json({ error: e.message }); }
-    });
-  });
-  r.on('error', e => res.status(500).json({ error: e.message }));
-  r.write(body);
-  r.end();
+// ── Sincronização — POST (envia dados para o servidor) ──
+app.post('/sync', (req, res) => {
+  const payload = req.body;
+  if(!payload || !payload.empresas) return res.status(400).json({error:'Dados inválidos'});
+  const ok = salvarDados(payload);
+  res.json({ok});
 });
 
 // Rota principal
