@@ -43,6 +43,16 @@ body{font-family:var(--F);background:var(--bg);color:var(--t1);font-size:13px;}
 #APP.show{display:flex;}
 
 .sb{width:var(--sw);background:var(--s1);border-right:1px solid var(--bd);display:flex;flex-direction:column;flex-shrink:0;}
+/* ── Mobile: sidebar desliza sobre o conteúdo ── */
+@media(max-width:768px){
+  .app{position:relative;}
+  .sb{position:fixed;top:0;left:0;height:100vh;z-index:1000;transform:translateX(-100%);transition:transform .25s ease;box-shadow:4px 0 24px rgba(0,0,0,.5);}
+  .sb.open{transform:translateX(0);}
+  .main{width:100vw!important;min-width:0!important;}
+  #mob-menu-btn{display:flex!important;}
+  #mob-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;}
+  #mob-overlay.open{display:block;}
+}
 .slogo{padding:15px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px;}
 .smark{width:38px;height:38px;border-radius:10px;background:linear-gradient(145deg,#0057FF,#0A2C6E);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;box-shadow:0 4px 14px rgba(0,87,255,.3);}
 .sname{font-size:13px;font-weight:800;line-height:1.2;}.ssub{font-size:9px;color:var(--gold);letter-spacing:1.8px;text-transform:uppercase;font-weight:700;margin-top:1px;}
@@ -299,7 +309,9 @@ tr:hover td{background:rgba(255,255,255,.017);}
 
 <!-- APP -->
 <div id="APP">
-<div class="sb">
+<div class="sb" id="SIDEBAR">
+  <!-- Botão fechar no mobile -->
+  <button onclick="toggleSidebar()" style="display:none;position:absolute;top:10px;right:10px;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:18px;width:32px;height:32px;border-radius:8px;cursor:pointer;align-items:center;justify-content:center;z-index:10" id="mob-close-btn">✕</button>
   <div class="slogo"><div class="smark">⚡</div><div><div class="sname">Aliance</div><div class="ssub">Gerencie clientes. Feche mais negócios.</div></div></div>
   <nav id="NAV">
 
@@ -378,8 +390,12 @@ tr:hover td{background:rgba(255,255,255,.017);}
   </div>
 </div>
 
+<!-- Overlay mobile -->
+<div id="mob-overlay" onclick="toggleSidebar()"></div>
+
 <div class="main">
   <div class="tb">
+    <button id="mob-menu-btn" onclick="toggleSidebar()" style="display:none;background:transparent;border:none;color:var(--t1);font-size:22px;cursor:pointer;padding:4px 8px;margin-right:6px;border-radius:7px">☰</button>
     <div class="tbt"><em>Aliance</em> — <span id="pgt">Dashboard</span></div>
     <div class="tcl" id="clk">--:--:--</div>
   </div>
@@ -1358,6 +1374,7 @@ function applyProfile(){
 const PTIT={dashboard:'Dashboard',central:'',pipeline:'Pipeline de Vendas',clientes:'Clientes',empresas:'Empresas',contatos:'Contatos',mapa:'Mapa de Clientes',os:'Atendimentos',tarefas:'Tarefas',contratos:'Contratos',agenda:'Agenda',financeiro:'Financeiro',cobrancas:'Cobranças',equipe:'Equipe & Metas',relatorios:'Relatórios',notificacoes:'Notificações',whatsapp:'WhatsApp & Comunicação',usuarios:'Usuários & Acessos',email:'E-mail Marketing',inteligencia:'Inteligência IA',proposta:'Propostas',historico:'Histórico de Clientes',admin:'Painel Admin',config:'Configurações',cameras:''};
 const APGS=['financeiro','cobrancas','equipe','relatorios','usuarios','config'];
 function go(id,el){
+  closeSidebarMobile();
   if(APGS.includes(id)&&!isAdmin()){toast('⛔ Acesso restrito a administradores!');return;}
   document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
   const pg=$('pg-'+id);if(pg)pg.classList.add('on');
@@ -6915,6 +6932,31 @@ function gerarPDFOrcamento(id){
     doc.save(`Orcamento_${o.num}_${o.cli.replace(/\s/g,'_')}.pdf`);
     toast('✅ PDF do orçamento gerado!');
   }catch(e){ toast('❌ Erro ao gerar PDF: '+e.message); console.error(e); }
+
+}
+
+// ── Menu mobile ──────────────────────────────────
+function toggleSidebar(){
+  const sb=document.getElementById('SIDEBAR');
+  const ov=document.getElementById('mob-overlay');
+  const closeBtn=document.getElementById('mob-close-btn');
+  const menuBtn=document.getElementById('mob-menu-btn');
+  if(!sb) return;
+  const isOpen=sb.classList.contains('open');
+  sb.classList.toggle('open', !isOpen);
+  if(ov) ov.classList.toggle('open', !isOpen);
+  if(closeBtn) closeBtn.style.display=isOpen?'none':'flex';
+  if(menuBtn) menuBtn.style.display='flex';
+}
+
+function closeSidebarMobile(){
+  if(window.innerWidth>768) return;
+  const sb=document.getElementById('SIDEBAR');
+  const ov=document.getElementById('mob-overlay');
+  const closeBtn=document.getElementById('mob-close-btn');
+  if(sb) sb.classList.remove('open');
+  if(ov) ov.classList.remove('open');
+  if(closeBtn) closeBtn.style.display='none';
 
 }
 
