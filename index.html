@@ -6224,7 +6224,7 @@ async function jbReceber(){
   if(!_jbKey||!_jbBin) return false;
   try {
     // Chama JSONBin diretamente do navegador
-    const r=await fetch(`https://api.jsonbin.io/v3/b/${_jbBin}/latest`,{headers:{'X-Master-Key':_jbKey}});
+    const r=await fetch(`/sync`,{headers:{'X-Master-Key':_jbKey}});
     if(!r.ok) throw new Error('HTTP '+r.status);
     const data=await r.json();
     const p=data.record;
@@ -6252,40 +6252,77 @@ async function jbReceber(){
 }
 
 // ── Envia dados para o JSONBin ────────────────────
+// ── Supabase — Sincronização permanente ──────────
+const _SB_URL = 'https://yiauzqmjuejxkdezurtu.supabase.co';
+const _SB_KEY = 'sb_publishable_lQ_JxlJ92yZNuujGmJXzfg_tXsKs79c';
+
 async function jbEnviar(manual=false){
-  if(!_jbKey||!_jbBin) return;
   try {
-    // Marca timestamp ANTES de enviar
     DB._ts = Date.now();
     salvarLocal();
-
     const payload={
-      empresas:DB.empresas||[],
-      contatos:DB.contatos||[],
-      deals:DB.deals||[],
-      contratos:DB.contratos||[],
-      os:DB.os||[],
-      tasks:DB.tasks||[],
-      equips:DB.equips||{},
-      orcamentos:DB.orcamentos||[],
-      _ts:DB._ts
+      empresas:DB.empresas||[], contatos:DB.contatos||[],
+      deals:DB.deals||[], contratos:DB.contratos||[],
+      os:DB.os||[], tasks:DB.tasks||[], equips:DB.equips||{},
+      orcamentos:DB.orcamentos||[], metas:DB.metas||[],
+      tecnicos:DB.tecnicos||[], movs:DB.movs||[],
+      historico:DB.historico||{}, _ts:DB._ts
     };
-    // Chama JSONBin diretamente do navegador
-    const r=await fetch(`https://api.jsonbin.io/v3/b/${_jbBin}`,{
-      method:'PUT',
-      headers:{'Content-Type':'application/json','X-Master-Key':_jbKey},
-      body:JSON.stringify(payload)
+    const r=await fetch(`${_SB_URL}/rest/v1/crm_data?id=eq.alianca`,{
+      method:'PATCH',
+      headers:{
+        'Content-Type':'application/json',
+        'apikey':_SB_KEY,
+        'Authorization':'Bearer '+_SB_KEY,
+        'Prefer':'return=minimal'
+      },
+      body:JSON.stringify({data:payload, updated_at:new Date().toISOString()})
     });
-    if(!r.ok) throw new Error('HTTP '+r.status);
+    if(!r.ok){
+      // Se não existe, cria
+      const r2=await fetch(`${_SB_URL}/rest/v1/crm_data`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','apikey':_SB_KEY,'Authorization':'Bearer '+_SB_KEY},
+        body:JSON.stringify({id:'alianca',data:payload})
+      });
+    }
     if(manual) toast('✅ Dados sincronizados!');
-    console.log('☁️ JSONBin: enviado ts='+DB._ts);
+    console.log('☁️ Supabase: enviado OK');
   } catch(e){
-    console.error('JSONBin enviar:', e.message);
+    console.error('Supabase enviar:', e.message);
     if(manual) toast('❌ Erro: '+e.message);
   }
 }
 
-// ── Inicia sincronização automática ──────────────
+async function jbReceber(){
+  try {
+    const r=await fetch(`${_SB_URL}/rest/v1/crm_data?id=eq.alianca&select=data`,{
+      headers:{'apikey':_SB_KEY,'Authorization':'Bearer '+_SB_KEY}
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const rows=await r.json();
+    if(!rows?.length||!rows[0]?.data) return false;
+    const p=rows[0].data;
+    const tsNuvem=p._ts||0;
+    const tsLocal=DB._ts||0;
+    if(tsNuvem<=tsLocal) return false;
+
+    ['empresas','contatos','deals','contratos','os','tasks',
+     'equips','orcamentos','metas','tecnicos','movs','historico'].forEach(k=>{
+      if(p[k]!==undefined) DB[k]=p[k];
+    });
+    DB._ts=tsNuvem;
+    rTopCli();rPipeline();rClientes();rOS();rTasks();rContratos();
+    rNotifs();if(typeof rOrcamentos==='function')rOrcamentos();if(typeof rDashMetas==='function')rDashMetas();
+    salvarLocal();
+    toast('🔄 Dados atualizados!');
+    return true;
+  } catch(e){
+    console.error('Supabase receber:', e.message);
+    return false;
+  }
+}
+
 function iniciarSyncJB(){
   if(!_jbKey||!_jbBin) return;
   clearInterval(_jbTimer);
