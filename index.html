@@ -344,9 +344,8 @@ tr:hover td{background:rgba(255,255,255,.017);}
     </div>
     <div class="nav-group" id="nav-op">
       <div class="ni" data-p="os" onclick="go('os',this)"><span class="nic">🔧</span>Atendimentos<span class="nb o" id="nb-os">0</span></div>
-      <div class="ni" data-p="tarefas" onclick="go('tarefas',this)"><span class="nic">✅</span>Tarefas<span class="nb o" id="nb-tsk">0</span></div>
+            <div class="ni" data-p="agenda" onclick="go('agenda',this)"><span class="nic">📅</span>Agenda &amp; Tarefas<span class="nb o" id="nb-tsk">0</span></div>
       <div class="ni" data-p="contratos" onclick="go('contratos',this)"><span class="nic">📄</span>Contratos</div>
-      <div class="ni" data-p="agenda" onclick="go('agenda',this)"><span class="nic">📅</span>Agenda</div>
       <div class="ni" data-p="mapa" onclick="go('mapa',this)"><span class="nic">🗺️</span>Mapa de Clientes de Clientes</div>
     </div>
 
@@ -552,9 +551,28 @@ tr:hover td{background:rgba(255,255,255,.017);}
 
 <!-- AGENDA -->
 <div class="pg" id="pg-agenda">
-  <div class="g2">
-    <div class="card"><div class="ch"><span class="ct">📅 Hoje</span><button class="btn bg sm adm" onclick="M.open('agenda')">+ Evento</button></div><div class="cb" id="ag-h"></div></div>
-    <div class="card"><div class="ch"><span class="ct">📆 Próximos 7 Dias</span></div><div class="cb" id="ag-s"></div></div>
+  <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
+    <div class="fb on" id="at-tab-ag" onclick="abaAgendaTarefas('ag')">📅 Agenda</div>
+    <div class="fb" id="at-tab-tk" onclick="abaAgendaTarefas('tk')">✅ Tarefas</div>
+    <span style="font-size:12px;color:var(--t2);margin-left:4px">Pendentes: <strong id="tp" style="color:var(--orange)">0</strong></span>
+    <button class="btn bg sm adm" id="btn-at-ag" style="margin-left:auto" onclick="M.open('agenda')">+ Evento</button>
+    <button class="btn bgh sm" id="btn-at-tk" style="display:none" onclick="abrirNovaTarefa()">+ Tarefa</button>
+  </div>
+  <div id="at-sec-ag">
+    <div class="g2">
+      <div class="card"><div class="ch"><span class="ct">📅 Hoje</span></div><div class="cb" id="ag-h"></div></div>
+      <div class="card"><div class="ch"><span class="ct">📆 Próximos 7 Dias</span></div><div class="cb" id="ag-s"></div></div>
+    </div>
+  </div>
+  <div id="at-sec-tk" style="display:none">
+    <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:8px">
+      <div class="fb on" onclick="filtrarTasks(this,'all')">Todas</div>
+      <div class="fb" onclick="filtrarTasks(this,'pend')">⏳ Pendentes</div>
+      <div class="fb" onclick="filtrarTasks(this,'done')">✅ Concluídas</div>
+      <div class="fb" onclick="filtrarTasks(this,'hoje')">🔥 Hoje</div>
+      <div class="fb" onclick="filtrarTasks(this,'atrasada')">🚨 Atrasadas</div>
+    </div>
+    <div id="tsk-lista" style="display:flex;flex-direction:column;gap:7px"></div>
   </div>
 </div>
 
@@ -1387,10 +1405,11 @@ function go(id,el){
   if(id==='usuarios') setTimeout(rUsuarios,100);
   if(id==='proposta')  setTimeout(rPropostas,100);
   if(id==='orcamento') setTimeout(rOrcamentos,100);
+  if(id==='agenda')   setTimeout(()=>{rAgenda();rTasks();},100);
   if(id==='historico'){ setTimeout(()=>{popularHistoricoSel();rHistorico(_histCliente);},100); }
   if(id==='whatsapp') setTimeout(()=>{ rWACfg(); rWAAutoCfg(); },100);
   if(id==='os')       setTimeout(()=>{ rOS(); rTecnicos(); },100);
-  if(id==='tarefas')  setTimeout(rTasks,100);
+  
   if(id==='equipe')   setTimeout(rEquipe,100);
   if(id==='config')   setTimeout(()=>{ atualizarStatusGDrive(); atualizarBackupStats(); atualizarStatusConexao(); atualizarStatusJB(); setTimeout(atualizarStatusKey,200); },100);
   setTimeout(initCharts,120);
@@ -3430,7 +3449,7 @@ const M={
       rFinanceiro();M.close();toast('✅ Lançamento registrado!');updKPI();return;
 
     }else if(_mtype==='tecnico'){
-      const nome=gv('f0');if(!nome){toast('⚠️ Informe o nome!');return;}
+      const nome=($('f0')?.value||'').trim();if(!nome){toast('⚠️ Informe o nome completo!');return;}
       const tel=($('tec-tel')?.value||'').trim();
       const esp=($('tec-esp')?.value||'').trim();
       const salario=parseFloat($('tec-sal')?.value||'0')||0;
@@ -6958,6 +6977,20 @@ function closeSidebarMobile(){
   if(ov) ov.classList.remove('open');
   if(closeBtn) closeBtn.style.display='none';
 
+}
+
+
+function abaAgendaTarefas(aba){
+  const secAg=$('at-sec-ag'), secTk=$('at-sec-tk');
+  const tabAg=$('at-tab-ag'), tabTk=$('at-tab-tk');
+  const btnAg=$('btn-at-ag'), btnTk=$('btn-at-tk');
+  const isAg=aba==='ag';
+  if(secAg) secAg.style.display=isAg?'':'none';
+  if(secTk) secTk.style.display=isAg?'none':'';
+  if(tabAg){tabAg.classList.toggle('on',isAg); tabTk.classList.toggle('on',!isAg);}
+  if(btnAg) btnAg.style.display=isAg?'':'none';
+  if(btnTk) btnTk.style.display=isAg?'none':'';
+  if(isAg) rAgenda(); else rTasks();
 }
 
 function popularHistoricoSel(){
