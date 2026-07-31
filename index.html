@@ -2222,6 +2222,14 @@ function filtrarTasks(el,f){
 }
 
 function rTasks(){
+  // Sempre atualiza o badge do menu, mesmo fora da aba
+  const pend=DB.tasks.filter(t=>!t.done).length;
+  const done=DB.tasks.filter(t=>t.done).length;
+  const tp=$('tp'),td=$('td');
+  if(tp)tp.textContent=pend; if(td)td.textContent=done;
+  set('nb-tsk',pend);
+
+  // Só renderiza a lista se estiver visível
   const el=$('tsk-lista'); if(!el) return;
   const hoje=new Date(); hoje.setHours(0,0,0,0);
 
@@ -2246,12 +2254,6 @@ function rTasks(){
     if(!t.dataHora||t.done) return false;
     return new Date(t.dataHora)<new Date();
   });
-
-  const pend=DB.tasks.filter(t=>!t.done).length;
-  const done=DB.tasks.filter(t=>t.done).length;
-  const tp=$('tp'),td=$('td');
-  if(tp)tp.textContent=pend; if(td)td.textContent=done;
-  set('nb-tsk',pend);
 
   if(!data.length){
     el.innerHTML=empty('✅','Nenhuma tarefa','Clique em "+ Nova Tarefa" para adicionar');
