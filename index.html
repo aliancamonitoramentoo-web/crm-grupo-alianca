@@ -4811,8 +4811,8 @@ function salvarLocal(){
     localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
     _ultimoSave = new Date();
     atualizarBackupStats();
-    // Envia para JSONBin se configurado (debounce 3s)
-    if(_jbKey&&_jbBin){ clearTimeout(window._jbTimer2); window._jbTimer2=setTimeout(()=>jbEnviar(), 3000); }
+    // Envia para Supabase imediatamente após mudança (debounce 1s)
+    clearTimeout(window._jbTimer2); window._jbTimer2=setTimeout(()=>jbEnviar(), 1000);
   } catch(e){ console.error('Erro ao salvar local:', e); }
 }
 function carregarLocal(){
@@ -6220,38 +6220,6 @@ function atualizarStatusJB(){
 }
 
 // ── Recebe dados do JSONBin ───────────────────────
-async function jbReceber(){
-  if(!_jbKey||!_jbBin) return false;
-  try {
-    // Chama JSONBin diretamente do navegador
-    const r=await fetch(`/sync`,{headers:{'X-Master-Key':_jbKey}});
-    if(!r.ok) throw new Error('HTTP '+r.status);
-    const data=await r.json();
-    const p=data.record;
-    if(!p?.empresas) return false;
-
-    const tsNuvem=p._ts||0;
-    const tsLocal=DB._ts||0;
-
-    // Se nuvem tem dados mais recentes, aplica
-    if(tsNuvem>tsLocal){
-      ['empresas','contatos','deals','contratos','os','tasks','equips','orcamentos'].forEach(k=>{
-        if(p[k]!==undefined) DB[k]=p[k];
-      });
-      DB._ts=tsNuvem;
-      rTopCli();rPipeline();rClientes();rOS();rTasks();rContratos();rNotifs();
-      salvarLocal();
-      console.log('☁️ Dados atualizados da nuvem ts='+tsNuvem);
-      return true;
-    }
-    return false;
-  } catch(e){
-    console.error('JSONBin receber:', e.message);
-    return false;
-  }
-}
-
-// ── Envia dados para o JSONBin ────────────────────
 // ── Supabase — Sincronização permanente ──────────
 const _SB_URL = 'https://yiauzqmjuejxkdezurtu.supabase.co';
 const _SB_KEY = 'sb_publishable_lQ_JxlJ92yZNuujGmJXzfg_tXsKs79c';
@@ -6301,33 +6269,33 @@ async function jbReceber(){
     });
     if(!r.ok) throw new Error('HTTP '+r.status);
     const rows=await r.json();
-    if(!rows?.length||!rows[0]?.data) {
-      // Supabase vazio — envia dados locais para lá
-      console.log('☁️ Supabase vazio — enviando dados locais');
+
+    // Supabase vazio — envia dados locais
+    if(!rows?.length||!rows[0]?.data){
       await jbEnviar(false);
       return false;
     }
+
     const p=rows[0].data;
     const tsNuvem=p._ts||0;
     const tsLocal=DB._ts||0;
 
-    // Se local é mais novo — envia para nuvem
-    if(tsLocal > tsNuvem){
-      console.log('☁️ Local mais novo — enviando para Supabase');
-      await jbEnviar(false);
+    // Local mais novo — envia para nuvem (inclui deleções)
+    if(tsLocal >= tsNuvem){
+      if(tsLocal > tsNuvem) await jbEnviar(false);
       return false;
     }
 
-    // Se nuvem é mais nova — baixa
-    if(tsNuvem <= tsLocal) return false;
-
+    // Nuvem mais nova — baixa e aplica
     ['empresas','contatos','deals','contratos','os','tasks',
      'equips','orcamentos','metas','tecnicos','movs','historico'].forEach(k=>{
       if(p[k]!==undefined) DB[k]=p[k];
     });
     DB._ts=tsNuvem;
     rTopCli();rPipeline();rClientes();rOS();rTasks();rContratos();
-    rNotifs();if(typeof rOrcamentos==='function')rOrcamentos();if(typeof rDashMetas==='function')rDashMetas();
+    rNotifs();
+    if(typeof rOrcamentos==='function') rOrcamentos();
+    if(typeof rDashMetas==='function') rDashMetas();
     salvarLocal();
     toast('🔄 Dados atualizados!');
     return true;
@@ -6339,16 +6307,12 @@ async function jbReceber(){
 
 function iniciarSyncJB(){
   clearInterval(_jbTimer);
-  // Ao iniciar: compara timestamps e decide o que fazer
-  setTimeout(async()=>{
-    await jbReceber(); // jbReceber já trata envio se local for mais novo
-  }, 2000);
-  // A cada 20s sincroniza
-  _jbTimer=setInterval(async()=>{
-    await jbReceber();
-  }, 20000);
+  // Ao iniciar: sincroniza imediatamente
+  setTimeout(async()=>{ await jbReceber(); }, 1500);
+  // A cada 5 segundos verifica se há dados novos
+  _jbTimer=setInterval(async()=>{ await jbReceber(); }, 5000);
   _jbSync=true;
-  console.log('☁️ Supabase: sync iniciado');
+  console.log('☁️ Supabase: sync iniciado (5s)');
 }
 
 // ═══════════════════════════════════════════════════
