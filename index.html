@@ -537,23 +537,6 @@ tr:hover td{background:rgba(255,255,255,.017);}
 </div>
 
 <!-- TAREFAS -->
-<div class="pg" id="pg-tarefas">
-  <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
-    <div class="fb on" onclick="filtrarTasks(this,'all')">Todas</div>
-    <div class="fb" onclick="filtrarTasks(this,'pend')">⏳ Pendentes</div>
-    <div class="fb" onclick="filtrarTasks(this,'done')">✅ Concluídas</div>
-    <div class="fb" onclick="filtrarTasks(this,'hoje')">🔥 Hoje</div>
-    <div class="fb" onclick="filtrarTasks(this,'atrasada')">🚨 Atrasadas</div>
-    <div style="font-size:12px;color:var(--t2);margin-left:4px">
-      Pendentes: <strong id="tp" style="color:var(--orange)">0</strong> &nbsp;
-      Concluídas: <strong id="td" style="color:var(--green)">0</strong>
-    </div>
-    <button class="btn bg sm" style="margin-left:auto" onclick="abrirNovaTarefa()">+ Nova Tarefa</button>
-  </div>
-  <div id="tsk-lista" style="display:flex;flex-direction:column;gap:7px;margin-top:4px"></div>
-</div>
-
-<!-- CONTRATOS -->
 <div class="pg" id="pg-contratos">
   <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
     <div class="srch" style="max-width:290px"><span style="color:var(--t3)">🔍</span><input type="text" placeholder="Buscar..." id="srch-cont2" oninput="filterCont2()"></div>
