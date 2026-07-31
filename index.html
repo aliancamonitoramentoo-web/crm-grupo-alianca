@@ -6234,7 +6234,9 @@ async function jbEnviar(manual=false){
       os:DB.os||[], tasks:DB.tasks||[], equips:DB.equips||{},
       orcamentos:DB.orcamentos||[], metas:DB.metas||[],
       tecnicos:DB.tecnicos||[], movs:DB.movs||[],
-      historico:DB.historico||{}, _ts:DB._ts
+      historico:DB.historico||{},
+      _users:USERS.map(u=>({...u})),  // ← inclui usuários
+      _ts:DB._ts
     };
     const r=await fetch(`${_SB_URL}/rest/v1/crm_data?id=eq.alianca`,{
       method:'PATCH',
@@ -6291,6 +6293,11 @@ async function jbReceber(){
      'equips','orcamentos','metas','tecnicos','movs','historico'].forEach(k=>{
       if(p[k]!==undefined) DB[k]=p[k];
     });
+    // Aplica usuários sincronizados
+    if(p._users?.length){
+      USERS.length=0;
+      p._users.forEach(u=>USERS.push(u));
+    }
     DB._ts=tsNuvem;
     rTopCli();rPipeline();rClientes();rOS();rTasks();rContratos();
     rNotifs();
