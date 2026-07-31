@@ -6301,11 +6301,25 @@ async function jbReceber(){
     });
     if(!r.ok) throw new Error('HTTP '+r.status);
     const rows=await r.json();
-    if(!rows?.length||!rows[0]?.data) return false;
+    if(!rows?.length||!rows[0]?.data) {
+      // Supabase vazio — envia dados locais para lá
+      console.log('☁️ Supabase vazio — enviando dados locais');
+      await jbEnviar(false);
+      return false;
+    }
     const p=rows[0].data;
     const tsNuvem=p._ts||0;
     const tsLocal=DB._ts||0;
-    if(tsNuvem<=tsLocal) return false;
+
+    // Se local é mais novo — envia para nuvem
+    if(tsLocal > tsNuvem){
+      console.log('☁️ Local mais novo — enviando para Supabase');
+      await jbEnviar(false);
+      return false;
+    }
+
+    // Se nuvem é mais nova — baixa
+    if(tsNuvem <= tsLocal) return false;
 
     ['empresas','contatos','deals','contratos','os','tasks',
      'equips','orcamentos','metas','tecnicos','movs','historico'].forEach(k=>{
@@ -6324,18 +6338,17 @@ async function jbReceber(){
 }
 
 function iniciarSyncJB(){
-  if(!_jbKey||!_jbBin) return;
   clearInterval(_jbTimer);
-  // Recebe primeiro ao iniciar (pega dados mais recentes da nuvem)
-  jbReceber();
-  // A cada 30s: recebe dados mais novos OU envia se local for mais novo
+  // Ao iniciar: compara timestamps e decide o que fazer
+  setTimeout(async()=>{
+    await jbReceber(); // jbReceber já trata envio se local for mais novo
+  }, 2000);
+  // A cada 20s sincroniza
   _jbTimer=setInterval(async()=>{
-    const recebeu = await jbReceber();
-    // Se não recebeu nada novo, envia os dados locais
-    if(!recebeu && DB._ts) jbEnviar();
-  }, 30000);
+    await jbReceber();
+  }, 20000);
   _jbSync=true;
-  console.log('☁️ JSONBin: sync iniciado');
+  console.log('☁️ Supabase: sync iniciado');
 }
 
 // ═══════════════════════════════════════════════════
