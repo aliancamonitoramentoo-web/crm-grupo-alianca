@@ -2736,7 +2736,12 @@ function rResumo(){
 // ── USUÁRIOS ─────────────────────────────
 function rUsuarios(){
   const uc=$('usr-cards');if(!uc)return;
-  uc.innerHTML=USERS.map(u=>`<div class="uc">
+  uc.innerHTML=`
+  <div style="background:rgba(245,166,35,.07);border:1px solid rgba(245,166,35,.2);border-radius:9px;padding:10px;margin-bottom:10px;display:flex;align-items:center;gap:10px">
+    <span style="font-size:12px;color:var(--t2);flex:1">⚡ Sincronize para que outros computadores vejam as mudanças imediatamente</span>
+    <button class="btn bg sm" onclick="forceSyncUsers()">🔄 Sincronizar Agora</button>
+  </div>
+  `+USERS.map(u=>`<div class="uc">
     <div class="ucav" style="background:${u.cor}22;color:${u.cor}">${u.ini}</div>
     <div style="flex:1">
       <div style="font-size:14px;font-weight:800">
@@ -2766,6 +2771,12 @@ function editUser(id,field,val){
   if(CU&&CU.id===id){CU=u;applyProfile();}
   autoSave();toast(`✅ ${u.nome} atualizado!`);
 }
+async function forceSyncUsers(){
+  DB._ts=Date.now();
+  await jbEnviar(true);
+  toast('✅ Usuários sincronizados! Outros computadores verão em 5 segundos.');
+}
+
 function togglePerfil(id){
   const u=USERS.find(x=>x.id===id);if(!u)return;
   if(CU&&CU.id===id){toast('⛔ Não pode alterar o próprio perfil!');return;}
@@ -2776,7 +2787,11 @@ function removeUser(id){
   if(CU&&CU.id===id){toast('⛔ Não pode remover a própria conta!');return;}
   if(!confirm('Remover conta?'))return;
   const i=USERS.findIndex(x=>x.id===id);if(i>=0)USERS.splice(i,1);
-  rUsuarios();autoSave();toast('Conta removida!');
+  rUsuarios();
+  // Força sync imediato com Supabase
+  DB._ts=Date.now();
+  jbEnviar(false);
+  toast('Conta removida e sincronizada!');
 }
 
 // ── CONFIGURAÇÕES ─────────────────────────
@@ -3454,7 +3469,11 @@ const M={
       const cores=['#f5a623','#3d9bff','#00d97e','#b08fff','#ff8c42','#ff4560'];
       const corNova=cores[USERS.length%cores.length];
       USERS.push({id:uid(),nome,login,senha,perfil,cor:corNova,ini:nome.substring(0,2).toUpperCase()});
-      rUsuarios();autoSave();M.close();toast(`✅ Conta "${nome}" criada! Login: ${login}`);return;
+      rUsuarios();
+      // Força sync imediato com Supabase
+      DB._ts=Date.now();
+      jbEnviar(false);
+      M.close();toast(`✅ Conta "${nome}" criada! Login: ${login}`);return;
 
     }else if(_mtype==='mov'){
       const tipo=gv('f0'),valRaw=gv('f1');
