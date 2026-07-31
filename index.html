@@ -6108,11 +6108,14 @@ function executarImportacao(){
 //  ☁️ JSONBIN — Sincronização em Tempo Real
 // ═══════════════════════════════════════════════════
 
-let _jbKey  = localStorage.getItem('jb_key')  || '';
-let _jbBin  = localStorage.getItem('jb_bin')  || '';
-// Salva automaticamente se não estiver salvo
-if(!localStorage.getItem('jb_key')) localStorage.setItem('jb_key', _jbKey);
-if(!localStorage.getItem('jb_bin')) localStorage.setItem('jb_bin', _jbBin);
+// JSONBin — chaves fixas no código (funciona em qualquer dispositivo)
+const _JB_KEY = '$2a$10$hVdT1fgXeYtrZdl2D1AX9uirosaAYDz7m5nlYUOkDI9OtZJ2G4qwa';
+const _JB_BIN = '69f53df9856a6821899751fd';
+let _jbKey  = localStorage.getItem('jb_key')  || _JB_KEY;
+let _jbBin  = localStorage.getItem('jb_bin')  || _JB_BIN;
+// Garante que sempre está salvo no localStorage
+localStorage.setItem('jb_key', _jbKey);
+localStorage.setItem('jb_bin', _jbBin);
 let _jbSync = false;
 let _jbTimer = null;
 
