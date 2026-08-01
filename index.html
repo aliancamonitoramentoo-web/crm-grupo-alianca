@@ -384,6 +384,7 @@ tr:hover td{background:rgba(255,255,255,.017);}
     <div class="sur">
       <div class="sav" id="sav">GA</div>
       <div style="flex:1;min-width:0"><div class="sn" id="snm">—</div><div class="sr" id="srl">—</div><div class="sbadge" id="sbadge">ADMIN</div></div>
+      <span class="lout adm" onclick="forceLogoutAll()" title="Deslogar todos os dispositivos" style="font-size:12px;margin-right:4px">🔒</span>
       <span class="lout" onclick="logout()" title="Sair">⏻</span>
     </div>
   </div>
@@ -1376,9 +1377,43 @@ async function login(){
 }
 function logout(){
   clearToken(); CU=null;
+  clearInterval(_jbTimer);
   $('APP').classList.remove('show'); $('LS').style.display='flex';
   $('lu').value=''; $('lp').value='';
 }
+
+// Força deslogar todos os dispositivos — salva flag no Supabase
+async function forceLogoutAll(){
+  if(!confirm('Isso vai deslogar TODOS os computadores e celulares do CRM.\n\nTem certeza?')) return;
+  try {
+    // Salva um timestamp de "força logout" no Supabase
+    const tsLogout = Date.now();
+    localStorage.setItem('crm_force_logout_ts', String(tsLogout));
+    const payload = { data: { ...await getBDFromSupabase(), _force_logout: tsLogout }, updated_at: new Date().toISOString() };
+    await fetch(`${_SB_URL}/rest/v1/crm_data?id=eq.alianca`,{
+      method:'PATCH',
+      headers:{'Content-Type':'application/json','apikey':_SB_KEY,'Authorization':'Bearer '+_SB_KEY},
+      body:JSON.stringify({ data: { _force_logout: tsLogout }, updated_at: new Date().toISOString() })
+    });
+    toast('✅ Todos os dispositivos serão deslogados em até 5 segundos!');
+    setTimeout(()=>logout(), 2000);
+  } catch(e) {
+    // Mesmo sem internet, loga fora localmente
+    toast('Deslogando...');
+    setTimeout(()=>logout(), 1000);
+  }
+}
+
+async function getBDFromSupabase(){
+  try {
+    const r = await fetch(`${_SB_URL}/rest/v1/crm_data?id=eq.alianca&select=data`,{
+      headers:{'apikey':_SB_KEY,'Authorization':'Bearer '+_SB_KEY}
+    });
+    const rows = await r.json();
+    return rows?.[0]?.data || {};
+  } catch(e){ return {}; }
+}
+
 function applyProfile(){
   if(!CU)return;
   const adm=isAdmin();
@@ -3652,7 +3687,8 @@ const M={
       DB.notifs.unshift({ic:'📄',t:`Contrato: ${cli}`,sub:`${srv} — ${fmtR(val)}/mês`,time:nowStr(),tipo:'success'});
       addFeed('📄','rgba(0,217,126,.12)',`Contrato: ${cli} — ${fmtR(val)}/mês`);
       ['ch-rec','ch-fin','ch-ano'].forEach(k=>{if(charts[k]){charts[k].destroy();delete charts[k];}});
-      rContratos();rEmpresas();rTopCli();rCobrancas();rNotifs();setTimeout(initCharts,100);
+      rContratos();rEmpresas();rTopCli();rCobrancas();rNotifs();updKPI();rDashMetas();setTimeout(initCharts,100);
+      autoSave(); // ← garante que DB._ts é atualizado e envia ao Supabase
 
     }else if(_mtype==='agenda'){
       const titulo=gv('f0');if(!titulo){toast('⚠️ Informe o título!');return;}
@@ -3660,7 +3696,7 @@ const M={
       const hora=dataRaw?new Date(dataRaw).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):nowStr();
       DB.agenda.h.unshift({h:hora,t:titulo,sub:cli,c:cor});
       addFeed('📅','rgba(61,155,255,.12)',`Evento: ${titulo}`);
-      rAgenda();
+      rAgenda(); autoSave();
 
     }else if(_mtype==='usuario'){
       const nome=gv('f0');if(!nome){toast('⚠️ Informe o nome!');return;}
@@ -3684,7 +3720,7 @@ const M={
       if(!valRaw){toast('⚠️ Informe o valor!');return;}
       const val=parseInt(valRaw.replace(/\D/g,''))||0;
       DB.movs.unshift({id:uid(),tipo,val:String(val),desc:gv('f2'),ref:gv('f3')});
-      rFinanceiro();M.close();toast('✅ Lançamento registrado!');updKPI();return;
+      rFinanceiro();updKPI();autoSave();M.close();toast('✅ Lançamento registrado!');return;
 
     }else if(_mtype==='tecnico'){
       const nome=($('f0')?.value||'').trim();if(!nome){toast('⚠️ Informe o nome completo!');return;}
@@ -6660,6 +6696,17 @@ async function jbReceber(){
     }
 
     const p=rows[0].data;
+
+    // Verifica se foi solicitado logout forçado
+    if(p._force_logout && p._force_logout > (parseInt(localStorage.getItem('crm_force_logout_ts'))||0)){
+      const meuTs = parseInt(localStorage.getItem('crm_force_logout_ts'))||0;
+      if(p._force_logout > meuTs){
+        toast('🔒 Sessão encerrada pelo administrador!');
+        setTimeout(()=>logout(), 1500);
+        return false;
+      }
+    }
+
     const tsNuvem=p._ts||0;
     const tsLocal=DB._ts||0;
 
