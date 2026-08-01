@@ -1848,6 +1848,7 @@ function editEmp(id,field,v){
 function delEmp(id){
   if(!confirm('Remover empresa e contatos vinculados?'))return;
   const e=DB.empresas.find(x=>x.id===id);
+  registrarDelecao(id);
   DB.empresas=DB.empresas.filter(x=>x.id!==id);
   if(e)DB.contatos=DB.contatos.filter(c=>c.emp!==e.nome);
   rEmpresas();rContatos();updKPI();rMapa();toast('Empresa removida!');
@@ -2271,7 +2272,7 @@ function gerarPDFOS(id){
 
 function editOS(id,f,v){const o=DB.os.find(x=>x.id===id);if(o)o[f]=v.trim();}
 function concluirOS(id){const o=DB.os.find(x=>x.id===id);if(o){o.s='at';rOS();updKPI();toast('OS concluída!');}}
-function delOS(id){if(!confirm('Remover OS?'))return;DB.os=DB.os.filter(x=>x.id!==id);rOS();updKPI();toast('OS removida!');}
+function delOS(id){if(!confirm('Remover OS?'))return;registrarDelecao(id);DB.os=DB.os.filter(x=>x.id!==id);rOS();updKPI();toast('OS removida!');}
 
 // ── TAREFAS ───────────────────────────────
 let _taskFilter='all';
@@ -2477,6 +2478,7 @@ function editTask(id,v){
 }
 function delTask(id){
   if(!confirm('Remover tarefa?'))return;
+  registrarDelecao(id);
   DB.tasks=DB.tasks.filter(x=>x.id!==id);
   rTasks();autoSave();toast('Tarefa removida!');
 }
@@ -2489,6 +2491,7 @@ function addTask(){
 function editContrato(id,field,v){const c=DB.contratos.find(x=>x.id===id);if(c){c[field]=v.trim();}}
 function delContrato(id){
   if(!confirm('Remover contrato?'))return;
+  registrarDelecao(id);
   DB.contratos=DB.contratos.filter(x=>x.id!==id);
   rContratos();rTopCli();rCobrancas();updKPI();
   ['ch-rec','ch-fin','ch-ano'].forEach(k=>{if(charts[k]){charts[k].destroy();delete charts[k];}});
@@ -2572,7 +2575,7 @@ function rFinanceiro(){
     </div>
   `:empty('💰','Sem lançamentos','Adicione entradas e saídas');
 }
-function delMov(id){DB.movs=DB.movs.filter(x=>x.id!==id);rFinanceiro();updKPI();toast('Lançamento removido!');}
+function delMov(id){registrarDelecao(id);DB.movs=DB.movs.filter(x=>x.id!==id);rFinanceiro();updKPI();toast('Lançamento removido!');}
 
 // ═══════════════════════════════════════════════════
 //  💸 SISTEMA DE COBRANÇAS
@@ -2780,6 +2783,7 @@ function editarCobranca(id){
 
 function delCobranca(id){
   if(!confirm('Remover cobrança?'))return;
+  registrarDelecao(id);
   DB.cobrancas=DB.cobrancas?.filter(x=>x.id!==id)||[];
   rCobrancas();autoSave();toast('Cobrança removida!');
 }
@@ -6610,6 +6614,7 @@ async function jbEnviar(manual=false){
       movs:          DB.movs||[],
       historico:     DB.historico||{},
       _users:        USERS.map(u=>({...u})),
+      _deleted:      DB._deleted||{},
       _ts:           DB._ts
     };
     const r=await fetch(`${_SB_URL}/rest/v1/crm_data?id=eq.alianca`,{
@@ -6638,39 +6643,43 @@ async function jbEnviar(manual=false){
 }
 
 // ── Merge inteligente: une local + nuvem sem perder dados ──
+// ── e respeita deleções via tombstones ──────────────────────
 function mergeDB(local, nuvem){
-  // Arrays: une por ID, prioriza o mais recente
+  // Tombstones = IDs que foram apagados (não devem voltar)
+  if(!DB._deleted) DB._deleted={};
+  if(nuvem._deleted){
+    Object.assign(DB._deleted, nuvem._deleted);
+  }
+  const deleted=DB._deleted;
+
   const camposArray=['empresas','contatos','deals','contratos','os','tasks',
                      'orcamentos','metas','cobrancas','tecnicos','movs'];
   camposArray.forEach(k=>{
     const locArr=local[k]||[];
     const nuvArr=nuvem[k];
-    if(!nuvArr) return; // nuvem não tem esse campo — mantém local
+    if(!nuvArr) return;
 
     if(nuvArr.length===0 && locArr.length>0){
-      // Nuvem vazia mas local tem dados — mantém local (não apaga!)
-      return;
+      return; // nuvem vazia mas local tem dados — mantém local
     }
-    // Une: pega todos IDs da nuvem + locais que não existem na nuvem
-    const idsNuvem=new Set(nuvArr.map(x=>x.id));
-    const somenteLocal=locArr.filter(x=>!idsNuvem.has(x.id));
-    local[k]=[...nuvArr, ...somenteLocal];
+
+    // Filtra itens apagados dos dois lados
+    const nuvFiltrado=nuvArr.filter(x=>!deleted[x.id]);
+    const idsNuvem=new Set(nuvFiltrado.map(x=>x.id));
+    // Pega itens locais que não estão na nuvem E não foram apagados
+    const somenteLocal=locArr.filter(x=>!idsNuvem.has(x.id)&&!deleted[x.id]);
+    local[k]=[...nuvFiltrado, ...somenteLocal];
   });
 
-  // Objetos: merge profundo
   const camposObj=['equips','historico','comprasClientes'];
   camposObj.forEach(k=>{
     const locObj=local[k]||{};
     const nuvObj=nuvem[k];
     if(!nuvObj) return;
-    // Une as chaves: local tem prioridade se nuvem estiver vazio
-    Object.keys(nuvObj).forEach(chave=>{
-      locObj[chave]=nuvObj[chave];
-    });
+    Object.keys(nuvObj).forEach(chave=>{ locObj[chave]=nuvObj[chave]; });
     local[k]=locObj;
   });
 
-  // Usuários
   if(nuvem._users?.length){
     USERS.length=0;
     nuvem._users.forEach(u=>USERS.push(u));
@@ -6678,6 +6687,16 @@ function mergeDB(local, nuvem){
 
   local._ts=nuvem._ts;
   return local;
+}
+
+// Registra ID como apagado e sincroniza imediatamente
+function registrarDelecao(id){
+  if(!DB._deleted) DB._deleted={};
+  DB._deleted[id]=Date.now();
+  // Envia imediatamente para nuvem (não espera o debounce)
+  DB._ts=Date.now();
+  salvarLocal();
+  jbEnviar(false);
 }
 
 async function jbReceber(){
@@ -7287,8 +7306,9 @@ function mudarStatusOrc(id, status){
 
 function delOrcamento(id){
   if(!confirm('Remover orçamento?')) return;
+  registrarDelecao(id);
   DB.orcamentos=DB.orcamentos.filter(x=>x.id!==id);
-  rOrcamentos(); autoSave(); toast('Orçamento removido!');
+  rOrcamentos(); toast('Orçamento removido!');
 }
 
 function gerarPDFOrcamento(id){
@@ -7700,6 +7720,7 @@ function editarMeta(id){
 
 function removerMeta(id){
   if(!confirm('Remover esta meta?'))return;
+  registrarDelecao(id);
   DB.metas=DB.metas.filter(m=>m.id!==id);
   renderListaMetas();rDashMetas();autoSave();toast('Meta removida!');
 }
