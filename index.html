@@ -3513,8 +3513,9 @@ const MFRM={
     <div class="fg"><label>Data e Hora *</label>
       <input class="fc" id="f1" type="datetime-local">
     </div>
-    <div class="fg"><label>Cliente</label>
-      <select class="fc" id="f3"></select>
+    <div class="fg"><label>Envolvido <span style="color:var(--t3)">(opcional)</span></label>
+      <input class="fc" id="ag-envolvido" placeholder="Cliente, empresa, pessoa ou deixe em branco" list="ag-envolvido-list">
+      <datalist id="ag-envolvido-list"></datalist>
     </div>
   </div>
   <div class="fg"><label>Observações</label>
@@ -3579,8 +3580,10 @@ const M={
       $('f0').innerHTML=tipos.map(t=>`<option>${t}</option>`).join('');
     }
     if($('f0')&&type==='contrato')$('f0').innerHTML=empOpts;
-    if($('f3')&&type==='agenda')$('f3').innerHTML=empOpts;
     if(type==='agenda'){
+      // Popula datalist de clientes (field livre)
+      const dl=$('ag-envolvido-list');
+      if(dl) dl.innerHTML=DB.empresas.map(e=>`<option value="${e.nome}">`).join('');
       // Popula técnicos
       const tsel=$('ag-tec');
       if(tsel) tsel.innerHTML='<option value="">— Sem técnico —</option>'
@@ -3773,7 +3776,7 @@ const M={
       const tipo=$('ag-tipo')?.value||'outro';
       const tec=$('ag-tec')?.value||'';
       const dataRaw=$('f1')?.value||'';
-      const cli=$('f3')?.value||'';
+      const cli=($('ag-envolvido')?.value||'').trim();
       const obs=($('ag-obs')?.value||'').trim();
       const corMap={reuniao:'#3d9bff',ligacao:'#b08fff',visita:'#f5a623',instalacao:'#00d97e',manutencao:'#ff8c42',entrega:'#00C48C',vistoria:'#ff4560',outro:'#7a96bb'};
       const icMap={reuniao:'🤝',ligacao:'📞',visita:'🏠',instalacao:'🔧',manutencao:'⚙️',entrega:'📦',vistoria:'🔍',outro:'📌'};
