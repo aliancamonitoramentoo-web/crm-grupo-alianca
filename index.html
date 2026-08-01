@@ -588,10 +588,25 @@ tr:hover td{background:rgba(255,255,255,.017);}
 
 <!-- COBRANÇAS -->
 <div class="pg" id="pg-cobrancas">
-  <div class="g2">
-    <div class="card"><div class="ch"><span class="ct">Status dos Contratos</span></div><div class="cb"><div style="height:190px"><canvas id="ch-cob"></canvas></div></div></div>
-    <div class="card"><div class="ch"><span class="ct">Faturas por Contrato</span></div><div class="cb"><table><thead><tr><th>Cliente</th><th>Valor</th><th>Vencimento</th><th>Status</th><th>Ação</th></tr></thead><tbody id="cob-tbl"></tbody></table></div></div>
+  <!-- KPIs -->
+  <div class="g4" style="margin-bottom:4px">
+    <div class="kpi kr"><div class="kic">🚨</div><div class="kl">Em Atraso</div><div class="kv" id="cob-k-atrasado">0</div><div class="kd" id="cob-k-atrasadov">—</div></div>
+    <div class="kpi ko"><div class="kic">⏰</div><div class="kl">Vence Hoje/Amanhã</div><div class="kv" id="cob-k-hoje">0</div><div class="kd" id="cob-k-hojed">—</div></div>
+    <div class="kpi kb"><div class="kic">📋</div><div class="kl">Pendentes</div><div class="kv" id="cob-k-pend">0</div><div class="kd" id="cob-k-pendv">—</div></div>
+    <div class="kpi kg"><div class="kic">✅</div><div class="kl">Pagas este Mês</div><div class="kv" id="cob-k-pago">0</div><div class="kd" id="cob-k-pagov">—</div></div>
   </div>
+
+  <!-- Filtros e ações -->
+  <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
+    <div class="fb on" id="cob-f-all" onclick="filtrarCob(this,'all')">Todas</div>
+    <div class="fb" id="cob-f-atrasado" onclick="filtrarCob(this,'atrasado')">🚨 Atrasadas</div>
+    <div class="fb" id="cob-f-pendente" onclick="filtrarCob(this,'pendente')">⏳ Pendentes</div>
+    <div class="fb" id="cob-f-pago" onclick="filtrarCob(this,'pago')">✅ Pagas</div>
+    <button class="btn bg adm" style="margin-left:auto" onclick="novaCobranca()">+ Nova Cobrança</button>
+  </div>
+
+  <!-- Lista de cobranças -->
+  <div id="cob-lista" style="display:flex;flex-direction:column;gap:8px;margin-top:4px"></div>
 </div>
 
 <!-- EQUIPE -->
@@ -1400,7 +1415,7 @@ function go(id,el){
   if(id==='admin')    setTimeout(rAdminPanel,100);
   if(id==='usuarios') setTimeout(rUsuarios,100);
   if(id==='proposta')  setTimeout(rPropostas,100);
-  if(id==='orcamento') setTimeout(rOrcamentos,100);
+  if(id==='cobrancas') setTimeout(rCobrancas,100);
   if(id==='agenda')   setTimeout(()=>{rAgenda();rTasks();},100);
   if(id==='historico'){ setTimeout(()=>{popularHistoricoSel();rHistorico(_histCliente);},100); }
   if(id==='whatsapp') setTimeout(()=>{ rWACfg(); rWAAutoCfg(); },100);
@@ -2515,21 +2530,216 @@ function rFinanceiro(){
 }
 function delMov(id){DB.movs=DB.movs.filter(x=>x.id!==id);rFinanceiro();updKPI();toast('Lançamento removido!');}
 
-// ── COBRANÇAS — geradas dos contratos reais
-function rCobrancas(){
-  const t=$('cob-tbl');if(!t)return;
-  if(!DB.contratos.length){t.innerHTML=`<tr><td colspan="5">${empty('🧾','Sem cobranças','Criadas automaticamente dos contratos')}</td></tr>`;return;}
-  t.innerHTML=DB.contratos.map(c=>`<tr>
-    <td><strong>${c.cli}</strong></td>
-    <td style="font-weight:800;font-family:var(--M);color:${c.s==='pd'?'var(--red)':'var(--t1)'}">${fmtR(c.val)}/mês</td>
-    <td style="color:var(--t2);font-size:11px">${c.venc||'—'}</td>
-    <td>${st(c.s)}</td>
-    <td><div style="display:flex;gap:5px">
-      <button class="btn bgr sm" onclick="toast('💬 Cobrança enviada!')">💬</button>
-      <button class="btn bb sm" onclick="toast('🧾 Fatura gerada!')">🧾</button>
-    </div></td>
-  </tr>`).join('');
+// ═══════════════════════════════════════════════════
+//  💸 SISTEMA DE COBRANÇAS
+// ═══════════════════════════════════════════════════
+
+let _cobFiltro='all';
+function filtrarCob(el,f){
+  document.querySelectorAll('#pg-cobrancas .fb').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on'); _cobFiltro=f; rCobrancas();
 }
+
+function rCobrancas(){
+  const el=$('cob-lista'); if(!el) return;
+  if(!DB.cobrancas) DB.cobrancas=[];
+
+  const hoje=new Date(); hoje.setHours(0,0,0,0);
+  const amanha=new Date(hoje); amanha.setDate(amanha.getDate()+1);
+
+  // Classifica cada cobrança
+  function statusCob(c){
+    if(c.pago) return 'pago';
+    if(!c.vencimento) return 'pendente';
+    const v=new Date(c.vencimento); v.setHours(0,0,0,0);
+    if(v<hoje) return 'atrasado';
+    if(v.getTime()===hoje.getTime()||v.getTime()===amanha.getTime()) return 'hoje';
+    return 'pendente';
+  }
+
+  // KPIs
+  const atrasadas=DB.cobrancas.filter(c=>statusCob(c)==='atrasado');
+  const hoje_amanha=DB.cobrancas.filter(c=>statusCob(c)==='hoje');
+  const pendentes=DB.cobrancas.filter(c=>['pendente','hoje'].includes(statusCob(c)));
+  const pagas=DB.cobrancas.filter(c=>c.pago);
+  const mesAtualStr=`${hoje.getMonth()+1}/${hoje.getFullYear()}`;
+  const pagasMes=pagas.filter(c=>c.pagoEm?.includes?.(mesAtualStr)||true);
+
+  set('cob-k-atrasado', atrasadas.length);
+  set('cob-k-atrasadov', atrasadas.length?fmtR(atrasadas.reduce((a,c)=>a+parseFloat(c.valor||0),0)):'—');
+  set('cob-k-hoje', hoje_amanha.length);
+  set('cob-k-hojed', hoje_amanha.length?'Atenção!':'Tranquilo');
+  set('cob-k-pend', pendentes.length);
+  set('cob-k-pendv', pendentes.length?fmtR(pendentes.reduce((a,c)=>a+parseFloat(c.valor||0),0)):'—');
+  set('cob-k-pago', pagas.length);
+  set('cob-k-pagov', pagas.length?fmtR(pagas.reduce((a,c)=>a+parseFloat(c.valor||0),0)):'—');
+  set('nb-cob', atrasadas.length);
+
+  // Filtra
+  let data=[...DB.cobrancas].sort((a,b)=>{
+    const sa=statusCob(a), sb=statusCob(b);
+    const ordem={atrasado:0,hoje:1,pendente:2,pago:3};
+    return (ordem[sa]||2)-(ordem[sb]||2);
+  });
+  if(_cobFiltro==='atrasado') data=data.filter(c=>statusCob(c)==='atrasado');
+  if(_cobFiltro==='pendente') data=data.filter(c=>['pendente','hoje'].includes(statusCob(c)));
+  if(_cobFiltro==='pago')     data=data.filter(c=>c.pago);
+
+  if(!data.length){
+    el.innerHTML=empty('💸','Nenhuma cobrança','Clique em "+ Nova Cobrança" para registrar');
+    return;
+  }
+
+  const corStatus={atrasado:'var(--red)',hoje:'var(--orange)',pendente:'var(--blue)',pago:'var(--green)'};
+  const icStatus={atrasado:'🚨',hoje:'⏰',pendente:'⏳',pago:'✅'};
+  const lblStatus={atrasado:'ATRASADO',hoje:'VENCE HOJE/AMANHÃ',pendente:'PENDENTE',pago:'PAGO'};
+
+  el.innerHTML=data.map(c=>{
+    const s=statusCob(c);
+    const cor=corStatus[s];
+    const diasAtraso=s==='atrasado'?Math.floor((hoje-new Date(c.vencimento))/(1000*60*60*24)):0;
+    const vencFmt=c.vencimento?new Date(c.vencimento).toLocaleDateString('pt-BR'):'Sem prazo';
+
+    return `<div style="background:var(--s1);border:1px solid ${s==='atrasado'?'rgba(255,69,96,.3)':s==='hoje'?'rgba(255,140,66,.3)':'var(--bd)'};border-left:4px solid ${cor};border-radius:11px;padding:13px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span style="font-size:10px;font-weight:800;color:${cor};background:${cor}18;padding:2px 8px;border-radius:20px">${icStatus[s]} ${lblStatus[s]}</span>
+            ${diasAtraso>0?`<span style="font-size:10px;color:var(--red);font-weight:700">${diasAtraso} dia(s) em atraso</span>`:''}
+          </div>
+          <div style="font-size:14px;font-weight:800;margin-bottom:3px">${c.cliente||'—'}</div>
+          <div style="font-size:12px;color:var(--t2)">${c.descricao||'Cobrança'}</div>
+          <div style="font-size:11px;color:var(--t3);margin-top:4px">
+            📅 Vencimento: <strong>${vencFmt}</strong>
+            ${c.pago&&c.pagoEm?` · ✅ Pago em: ${c.pagoEm}`:''} 
+            ${c.obs?` · ${c.obs}`:''}
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:22px;font-weight:900;color:${s==='pago'?'var(--green)':s==='atrasado'?'var(--red)':'var(--t1)'};font-family:var(--M)">${fmtR(parseFloat(c.valor||0))}</div>
+          ${c.parcela?`<div style="font-size:10px;color:var(--t3)">${c.parcela}</div>`:''}
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:10px;border-top:1px solid var(--bd);padding-top:9px;flex-wrap:wrap">
+        ${!c.pago?`<button class="btn sm" style="background:rgba(0,217,126,.12);color:var(--green);border:1px solid rgba(0,217,126,.3);flex:1;justify-content:center" onclick="marcarPago(${c.id})">✅ Marcar como Pago</button>`:''}
+        ${!c.pago&&c.cliente?`<button class="btn bgh sm" onclick="cobrarWhatsApp(${c.id})">💬 Cobrar WhatsApp</button>`:''}
+        <button class="btn bgh sm" onclick="editarCobranca(${c.id})">✏️</button>
+        <button class="btn br sm adm" onclick="delCobranca(${c.id})">🗑️</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function novaCobranca(){
+  const empOpts=DB.empresas.length
+    ?'<option value="">— Selecione —</option>'+DB.empresas.map(e=>`<option>${e.nome}</option>`).join('')
+    :'<option value="">— Cadastre clientes primeiro —</option>';
+
+  // Data padrão = hoje + 15 dias
+  const d=new Date(); d.setDate(d.getDate()+15);
+  const dataDefault=d.toISOString().slice(0,10);
+
+  $('mod-title').innerHTML='💸 Nova Cobrança';
+  $('mod-body').innerHTML=`
+    <div class="fg"><label>Cliente *</label><select class="fc" id="nc-cli">${empOpts}</select></div>
+    <div class="fg"><label>Descrição *</label><input class="fc" id="nc-desc" placeholder="Ex: Instalação de câmeras, Mensalidade, Serviço técnico"></div>
+    <div class="fg2">
+      <div class="fg"><label>💰 Valor (R$) *</label><input class="fc" id="nc-val" type="number" min="0" step="0.01" placeholder="Ex: 1500"></div>
+      <div class="fg"><label>📅 Prazo de Pagamento *</label><input class="fc" id="nc-venc" type="date" value="${dataDefault}"></div>
+    </div>
+    <div class="fg2">
+      <div class="fg"><label>Parcela</label><input class="fc" id="nc-parc" placeholder="Ex: 1/3, À vista"></div>
+      <div class="fg"><label>Forma de Pagamento</label>
+        <select class="fc" id="nc-forma">
+          <option value="">— Selecione —</option>
+          <option>PIX</option><option>Dinheiro</option><option>Cartão de Crédito</option>
+          <option>Cartão de Débito</option><option>Transferência</option><option>Boleto</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg"><label>Observações</label><textarea class="fc" id="nc-obs" rows="2" placeholder="Anotações sobre a cobrança..."></textarea></div>
+    <div style="background:rgba(245,166,35,.07);border:1px solid rgba(245,166,35,.2);border-radius:9px;padding:10px;font-size:12px;color:var(--t2)">
+      💡 O sistema avisa automaticamente quando a cobrança vencer ou atrasar.
+    </div>`;
+
+  $('mod-save-btn').textContent='💸 Criar Cobrança';
+  $('mod-save-btn').onclick=()=>{
+    const cli=$('nc-cli')?.value;
+    const desc=($('nc-desc')?.value||'').trim();
+    const val=parseFloat($('nc-val')?.value||'0')||0;
+    const venc=$('nc-venc')?.value;
+    if(!cli){toast('⚠️ Selecione o cliente!');return;}
+    if(!desc){toast('⚠️ Informe a descrição!');return;}
+    if(!val){toast('⚠️ Informe o valor!');return;}
+    if(!venc){toast('⚠️ Informe o prazo!');return;}
+    if(!DB.cobrancas) DB.cobrancas=[];
+    const cob={
+      id:uid(), cliente:cli, descricao:desc, valor:val,
+      vencimento:venc, parcela:($('nc-parc')?.value||'').trim(),
+      forma:($('nc-forma')?.value||''), obs:($('nc-obs')?.value||'').trim(),
+      pago:false, criadoEm:nowStr()
+    };
+    DB.cobrancas.push(cob);
+    DB.notifs.unshift({ic:'💸',t:`Cobrança: ${cli}`,sub:`${fmtR(val)} · Vence ${new Date(venc).toLocaleDateString('pt-BR')}`,time:nowStr(),tipo:'unread'});
+    adicionarEvento(cli,'fin',`Cobrança criada: ${fmtR(val)} — vence ${new Date(venc).toLocaleDateString('pt-BR')}`,'💸');
+    rCobrancas();rNotifs();updKPI();autoSave();
+    $('mod-save-btn').textContent='Salvar';$('mod-save-btn').onclick=()=>M.save();
+    M.close();toast(`✅ Cobrança criada! Prazo: ${new Date(venc).toLocaleDateString('pt-BR')}`);
+  };
+  $('MOD').classList.add('open');
+}
+
+function marcarPago(id){
+  const c=DB.cobrancas?.find(x=>x.id===id); if(!c) return;
+  c.pago=true; c.pagoEm=new Date().toLocaleDateString('pt-BR');
+  // Lança no financeiro
+  DB.movs.unshift({id:uid(),tipo:'in',val:String(c.valor),desc:`💸 Pagamento — ${c.cliente}`,ref:`${c.descricao} · ${c.pagoEm}`});
+  DB.notifs.unshift({ic:'✅',t:`Pago: ${c.cliente}`,sub:`${fmtR(c.valor)} recebido em ${c.pagoEm}`,time:nowStr(),tipo:'unread'});
+  adicionarEvento(c.cliente,'fin',`Pagamento recebido: ${fmtR(c.valor)}`,'✅');
+  rCobrancas();rFinanceiro();rNotifs();updKPI();autoSave();
+  toast(`✅ ${fmtR(c.valor)} marcado como pago e lançado no financeiro!`);
+}
+
+function cobrarWhatsApp(id){
+  const c=DB.cobrancas?.find(x=>x.id===id); if(!c) return;
+  const emp=DB.empresas.find(e=>e.nome===c.cliente)||{};
+  const tel=(emp.tel||'').replace(/\D/g,'');
+  if(!tel){toast('⚠️ Cliente sem WhatsApp cadastrado!');return;}
+  const vencFmt=c.vencimento?new Date(c.vencimento).toLocaleDateString('pt-BR'):'—';
+  const msg=`Olá ${c.cliente}! 😊\n\nPassando para lembrar sobre o pagamento pendente:\n\n📋 *${c.descricao}*\n💰 Valor: *${fmtR(c.valor)}*\n📅 Vencimento: *${vencFmt}*\n\nQualquer dúvida estamos à disposição!\n\n*Grupo Aliança Monitoramento* 🛡️`;
+  window.open(`https://wa.me/55${tel}?text=${encodeURIComponent(msg)}`,'_blank');
+  toast('💬 Mensagem de cobrança aberta no WhatsApp!');
+}
+
+function editarCobranca(id){
+  const c=DB.cobrancas?.find(x=>x.id===id); if(!c) return;
+  $('mod-title').innerHTML='✏️ Editar Cobrança';
+  $('mod-body').innerHTML=`
+    <div class="fg"><label>Descrição</label><input class="fc" id="ec-desc" value="${c.descricao||''}"></div>
+    <div class="fg2">
+      <div class="fg"><label>Valor (R$)</label><input class="fc" id="ec-val" type="number" value="${c.valor||0}"></div>
+      <div class="fg"><label>Prazo</label><input class="fc" id="ec-venc" type="date" value="${c.vencimento||''}"></div>
+    </div>
+    <div class="fg"><label>Observações</label><textarea class="fc" id="ec-obs" rows="2">${c.obs||''}</textarea></div>`;
+  $('mod-save-btn').textContent='💾 Salvar';
+  $('mod-save-btn').onclick=()=>{
+    c.descricao=($('ec-desc')?.value||'').trim();
+    c.valor=parseFloat($('ec-val')?.value||'0')||c.valor;
+    c.vencimento=$('ec-venc')?.value||c.vencimento;
+    c.obs=($('ec-obs')?.value||'').trim();
+    rCobrancas();autoSave();
+    $('mod-save-btn').textContent='Salvar';$('mod-save-btn').onclick=()=>M.save();
+    M.close();toast('✅ Cobrança atualizada!');
+  };
+  $('MOD').classList.add('open');
+}
+
+function delCobranca(id){
+  if(!confirm('Remover cobrança?'))return;
+  DB.cobrancas=DB.cobrancas?.filter(x=>x.id!==id)||[];
+  rCobrancas();autoSave();toast('Cobrança removida!');
+}
+
 
 // ── NOTIFICAÇÕES ──────────────────────────
 function rNotifs(){
@@ -6237,6 +6447,7 @@ async function jbEnviar(manual=false){
       deals:DB.deals||[], contratos:DB.contratos||[],
       os:DB.os||[], tasks:DB.tasks||[], equips:DB.equips||{},
       orcamentos:DB.orcamentos||[], metas:DB.metas||[],
+      cobrancas:DB.cobrancas||[],
       tecnicos:DB.tecnicos||[], movs:DB.movs||[],
       historico:DB.historico||{},
       _users:USERS.map(u=>({...u})),  // ← inclui usuários
@@ -6294,7 +6505,7 @@ async function jbReceber(){
 
     // Nuvem mais nova — baixa e aplica
     ['empresas','contatos','deals','contratos','os','tasks',
-     'equips','orcamentos','metas','tecnicos','movs','historico'].forEach(k=>{
+     'equips','orcamentos','metas','tecnicos','movs','historico','cobrancas'].forEach(k=>{
       if(p[k]!==undefined) DB[k]=p[k];
     });
     // Aplica usuários sincronizados
@@ -7309,6 +7520,7 @@ function initApp(){
   if(!DB.propostas)   DB.propostas=[];
   if(!DB.orcamentos)  DB.orcamentos=[];
   if(!DB.metas)       DB.metas=[];
+  if(!DB.cobrancas)   DB.cobrancas=[];
   if(!DB.historico)   DB.historico={};
   if(!DB.autoMsg)   DB.autoMsg={ativo:true,wa:true,email:true,msgWA:`Olá {nome}! 🎉\n\nSua execução foi aprovada! Em breve entraremos em contato para agendar.\n\nAtenciosamente,\nAliance CRM 🛡️`,msgEmail:`Prezado(a) {nome},\n\nConfirmamos a aprovação do seu contrato!\n\nNosso técnico entrará em contato em breve.\n\nAtenciosamente,\nAliance CRM`,assuntoEmail:'🏆 Bem-vindo ao Aliance CRM!'};
   if(!DB.adminCfg)  DB.adminCfg={osTipos:['Atendimento','Visita','Execução','Entrega','Suporte','Consultoria'],servicos:[{key:'sv',label:'🔧 Serviço',cor:'#0057FF'},{key:'pr',label:'📦 Produto',cor:'#8b5cf6'},{key:'co',label:'📋 Consultoria',cor:'#f59e0b'},{key:'mn',label:'🔄 Manutenção',cor:'#00C48C'},{key:'ou',label:'⭐ Outro',cor:'#ef4444'}],status:[{key:'at',label:'Ativo',cor:'#00d97e'},{key:'pr',label:'Proposta',cor:'#f5a623'},{key:'ng',label:'Negociação',cor:'#ff8c42'},{key:'pd',label:'Atraso',cor:'#ff4560'},{key:'vt',label:'Em andamento',cor:'#3d9bff'}],segmentos:['Condomínio','Comércio','Indústria','Saúde','Educação','Financeiro','Residencial','Outro'],camposExtras:[]};
