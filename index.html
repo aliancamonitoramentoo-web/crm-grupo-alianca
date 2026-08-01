@@ -3207,9 +3207,16 @@ function rTecnicos(){
 }
 
 function delTecnico(i){
-  const nome=typeof DB.tecnicos[i]==='string'?DB.tecnicos[i]:DB.tecnicos[i]?.nome||'';
+  const tec=DB.tecnicos[i];
+  const nome=typeof tec==='string'?tec:tec?.nome||'';
   if(!confirm(`Remover ${nome}?`)) return;
-  DB.tecnicos.splice(i,1); rTecnicos(); autoSave(); toast('Técnico removido!');
+  // Registra tombstone se tiver id
+  if(tec?.id) registrarDelecao(tec.id);
+  // Marca também pelo nome para garantir (tecnicos antigos sem id)
+  if(!DB._deletedNomes) DB._deletedNomes={};
+  DB._deletedNomes[nome.toLowerCase()]=Date.now();
+  DB.tecnicos.splice(i,1);
+  rTecnicos(); autoSave(); toast('Técnico removido!');
 }
 
 let _osFilter='all';
@@ -3837,7 +3844,7 @@ const M={
       if(DB.tecnicos.find(t=>(typeof t==='string'?t:t.nome)===nome)){
         toast(`⚠️ ${nome} já está cadastrado!`); return;
       }
-      DB.tecnicos.push({nome,tel,esp,salario,diaria});
+      DB.tecnicos.push({id:uid(),nome,tel,esp,salario,diaria});
       rTecnicos();M.close();
       addFeed('👷','rgba(245,166,35,.12)',`Técnico cadastrado: ${nome}${diaria>0?' · Diária: '+fmtR(diaria):''}`);
       autoSave();toast(`👷 ${nome} cadastrado! ${diaria>0?'Diária: '+fmtR(diaria):''}` );return;
@@ -5172,8 +5179,9 @@ function salvarLocal(){
     ['empresas','contatos','deals','stages','tasks','contratos','os','agenda',
      'cameras','alertas','notifs','wa','feed','movs','tecnicos','cfgN','waTpls',
      'equips','feedbacks','orcamentos','metas','cobrancas','comprasClientes','historico'].forEach(k=>{if(DB[k]!==undefined)p[k]=DB[k];});
-    p._users   = USERS.map(u=>({...u}));
-    p._deleted = DB._deleted||{};  // ← preserva lista de itens apagados
+    p._users        = USERS.map(u=>({...u}));
+    p._deleted      = DB._deleted||{};
+    p._deletedNomes = DB._deletedNomes||{};
     p._ts      = DB._ts||Date.now();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
     _ultimoSave = new Date();
@@ -5191,8 +5199,9 @@ function carregarLocal(){
      'cameras','alertas','notifs','wa','feed','movs','tecnicos','cfgN','waTpls',
      'equips','feedbacks','orcamentos','metas','cobrancas','comprasClientes','historico'].forEach(k=>{if(p[k]!==undefined)DB[k]=p[k];});
     if(p._users?.length){ USERS.length=0; p._users.forEach(u=>USERS.push(u)); }
-    if(p._deleted) DB._deleted=p._deleted;  // ← restaura lista de itens apagados
-    if(p._ts) DB._ts=p._ts;
+    if(p._deleted)      DB._deleted=p._deleted;
+    if(p._deletedNomes) DB._deletedNomes=p._deletedNomes;
+    if(p._ts)           DB._ts=p._ts;
     return true;
   } catch(e){ return false; }
 }
@@ -6722,6 +6731,7 @@ async function jbEnviar(manual=false){
       historico:     DB.historico||{},
       _users:        USERS.map(u=>({...u})),
       _deleted:      DB._deleted||{},
+      _deletedNomes: DB._deletedNomes||{},
       _ts:           DB._ts
     };
     const r=await fetch(`${_SB_URL}/rest/v1/crm_data?id=eq.alianca`,{
@@ -6786,6 +6796,20 @@ function mergeDB(local, nuvem){
     Object.keys(nuvObj).forEach(chave=>{ locObj[chave]=nuvObj[chave]; });
     local[k]=locObj;
   });
+
+  // Merge _deletedNomes (para técnicos sem id)
+  if(nuvem._deletedNomes){
+    if(!DB._deletedNomes) DB._deletedNomes={};
+    Object.assign(DB._deletedNomes, nuvem._deletedNomes);
+  }
+  // Filtra técnicos que foram deletados por nome
+  if(local.tecnicos){
+    const delNomes=DB._deletedNomes||{};
+    local.tecnicos=local.tecnicos.filter(t=>{
+      const nome=(typeof t==='string'?t:t?.nome||'').toLowerCase();
+      return !delNomes[nome];
+    });
+  }
 
   if(nuvem._users?.length){
     USERS.length=0;
