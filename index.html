@@ -5069,23 +5069,29 @@ function salvarLocal(){
   try {
     const p = {_ts:Date.now()};
     ['empresas','contatos','deals','stages','tasks','contratos','os','agenda',
-     'cameras','alertas','notifs','wa','feed','movs','tecnicos','cfgN','waTpls','equips','feedbacks'].forEach(k=>{if(DB[k]!==undefined)p[k]=DB[k];});
-    p._users = USERS.map(u=>({...u}));
+     'cameras','alertas','notifs','wa','feed','movs','tecnicos','cfgN','waTpls',
+     'equips','feedbacks','orcamentos','metas','cobrancas','comprasClientes','historico'].forEach(k=>{if(DB[k]!==undefined)p[k]=DB[k];});
+    p._users   = USERS.map(u=>({...u}));
+    p._deleted = DB._deleted||{};  // ← preserva lista de itens apagados
+    p._ts      = DB._ts||Date.now();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
     _ultimoSave = new Date();
     atualizarBackupStats();
-    // Envia para Supabase imediatamente após mudança (debounce 1s)
     clearTimeout(window._jbTimer2); window._jbTimer2=setTimeout(()=>jbEnviar(), 1000);
   } catch(e){ console.error('Erro ao salvar local:', e); }
 }
+
 function carregarLocal(){
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if(!raw) return false;
     const p = JSON.parse(raw);
     ['empresas','contatos','deals','stages','tasks','contratos','os','agenda',
-     'cameras','alertas','notifs','wa','feed','movs','tecnicos','cfgN','waTpls','equips','feedbacks'].forEach(k=>{if(p[k]!==undefined)DB[k]=p[k];});
+     'cameras','alertas','notifs','wa','feed','movs','tecnicos','cfgN','waTpls',
+     'equips','feedbacks','orcamentos','metas','cobrancas','comprasClientes','historico'].forEach(k=>{if(p[k]!==undefined)DB[k]=p[k];});
     if(p._users?.length){ USERS.length=0; p._users.forEach(u=>USERS.push(u)); }
+    if(p._deleted) DB._deleted=p._deleted;  // ← restaura lista de itens apagados
+    if(p._ts) DB._ts=p._ts;
     return true;
   } catch(e){ return false; }
 }
@@ -7589,6 +7595,85 @@ function atualizarMetaLivre(id, val){
   m.valorAtual=parseFloat(val)||0;
   rDashMetas(); autoSave();
 }
+
+async function analisarMetaIA(id){
+  const m=DB.metas.find(x=>x.id===id); if(!m) return;
+  if(!_apiKey){ toast('⚠️ Configure sua chave de IA em ⚙️ Configurações → Inteligência IA'); go('config'); return; }
+
+  const atual=calcValorMeta(m);
+  const alvo=parseFloat(m.alvo)||1;
+  const pct=Math.min(Math.round(atual/alvo*100),100);
+  const r=calcReceita();
+  const clientesAtivos=DB.empresas.filter(e=>e.s==='at').map(e=>e.nome).slice(0,5).join(', ');
+  const contratosAtivos=DB.contratos.filter(c=>c.s==='at');
+  const servicosMaisVendidos=[...new Set(contratosAtivos.map(c=>c.srv))].slice(0,3).join(', ');
+
+  const prompt=`Você é especialista em empresas de segurança eletrônica no Brasil.
+
+DADOS DA EMPRESA:
+- Meta: "${m.nome}" ${m.filtro?`(foco: ${m.filtro})`:''}
+- Progresso: ${atual} de ${alvo} ${m.unid||''} (${pct}%)
+- Receita atual: ${fmtR(r.recTotal)}
+- Clientes: ${DB.empresas.length} (${clientesAtivos||'nenhum'})
+- Contratos ativos: ${contratosAtivos.length}
+- Serviços: ${servicosMaisVendidos||'nenhum'}
+- OS concluídas: ${DB.os.filter(o=>o.s==='at').length}
+- Leads no funil: ${DB.deals.filter(d=>!d.cancelado).length}
+
+RESPONDA com estas seções:
+
+📊 **ANÁLISE DO PROGRESSO**
+(onde está e o que falta — 2 linhas)
+
+🎯 **3 AÇÕES IMEDIATAS**
+(ações práticas para bater essa meta agora)
+
+📱 **ESTRATÉGIAS DE MARKETING**
+(como outras empresas de segurança eletrônica captam clientes — WhatsApp, Instagram, condomínios, indicações, parcerias)
+
+💡 **IDEIA DIFERENCIADA**
+(algo que poucas empresas do ramo fazem)
+
+Máximo 220 palavras. Seja direto e prático.`;
+
+  // Abre modal com loading
+  $('mod-title').innerHTML='🤖 Análise Inteligente de Meta';
+  $('mod-body').innerHTML=`
+    <div style="background:var(--s2);border-radius:11px;padding:12px;margin-bottom:12px">
+      <div style="font-size:12px;font-weight:700;color:#3d9bff;margin-bottom:6px">🎯 ${m.nome}</div>
+      <div style="display:flex;gap:12px;font-size:12px;color:var(--t2)">
+        <span>Progresso: <strong style="color:${pct>=100?'var(--green)':pct>=70?'var(--gold)':pct>=40?'var(--orange)':'var(--red)'}">${pct}%</strong></span>
+        <span>${atual} / ${alvo} ${m.unid||''}</span>
+      </div>
+      <div style="background:var(--s1);border-radius:20px;height:8px;overflow:hidden;margin-top:8px">
+        <div style="width:${pct}%;height:100%;background:${pct>=100?'var(--green)':pct>=70?'var(--gold)':pct>=40?'var(--orange)':'var(--red)'};border-radius:20px"></div>
+      </div>
+    </div>
+    <div id="ia-meta-res" style="font-size:13px;line-height:1.8;color:var(--t1);text-align:center;padding:16px;color:var(--t3)">
+      <div style="font-size:28px">🤖</div>
+      <div style="margin-top:8px">Consultando IA + estratégias de mercado...</div>
+    </div>`;
+  const btn=$('mod-save-btn');
+  if(btn){btn.style.display='';btn.textContent='Fechar';btn.onclick=()=>{btn.textContent='Salvar';btn.onclick=()=>M.save();M.close();};}
+  $('MOD').classList.add('open');
+
+  try{
+    const analise=await chamarClaude(prompt, 600, 'Você é especialista em segurança eletrônica no Brasil. Responda sempre em português, de forma prática e direta.');
+    const html=analise
+      .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+      .replace(/📊/g,'<br><span style="color:#3d9bff;font-size:13px;font-weight:700">📊')
+      .replace(/🎯/g,'<br><span style="color:var(--gold);font-size:13px;font-weight:700">🎯')
+      .replace(/📱/g,'<br><span style="color:var(--green);font-size:13px;font-weight:700">📱')
+      .replace(/💡/g,'<br><span style="color:var(--orange);font-size:13px;font-weight:700">💡')
+      .replace(/\n/g,'<br>');
+    const resEl=$('ia-meta-res');
+    if(resEl) resEl.innerHTML=`<div style="text-align:left">${html}</div><div style="margin-top:12px;padding-top:8px;border-top:1px solid var(--bd);font-size:10px;color:var(--t3);text-align:center">🤖 Claude AI · ${new Date().toLocaleString('pt-BR')}</div>`;
+  }catch(e){
+    const resEl=$('ia-meta-res');
+    if(resEl) resEl.innerHTML=`<div style="color:var(--red)">❌ Erro: ${e.message}<br><small>Verifique sua chave em ⚙️ Configurações</small></div>`;
+  }
+}
+
 
 function abrirGerenciarMetas(){
   $('mod-title').innerHTML='🎯 Gerenciar Metas';
