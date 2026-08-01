@@ -2518,16 +2518,45 @@ function filterCont2(){const q=$('srch-cont2').value.toLowerCase();rContratos(DB
 // ── AGENDA ────────────────────────────────
 function rAgenda(){
   ['h','s'].forEach(p=>{
-    const el=$('ag-'+p);if(!el)return;
+    const el=$('ag-'+p); if(!el) return;
     const adm=isAdmin();
-    el.innerHTML=DB.agenda[p].length?DB.agenda[p].map((a,i)=>`<div class="agi">
-      <div class="agt">${a.h}</div>
-      <div class="agd" style="background:${a.c}"></div>
-      <div style="flex:1"><div style="font-size:12.5px;font-weight:600">${a.t}</div><div style="font-size:11px;color:var(--t2)">${a.sub}</div></div>
-      ${adm?`<button class="btn br sm" onclick="DB.agenda['${p}'].splice(${i},1);rAgenda()">🗑️</button>`:''}
-    </div>`).join(''):empty(p==='h'?'📅':'📆','Sem eventos','');
+    const hoje=new Date().toLocaleDateString('pt-BR');
+    if(!DB.agenda[p].length){ el.innerHTML=empty(p==='h'?'📅':'📆',p==='h'?'Sem eventos hoje':'Sem próximos eventos',''); return; }
+    el.innerHTML=DB.agenda[p].map((a,i)=>`
+      <div style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--bd)">
+        <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;min-width:44px">
+          <div style="font-size:11px;font-weight:700;color:${a.c||'var(--gold)'};font-family:var(--M)">${a.h||'—'}</div>
+          ${a.data&&a.data!==hoje?`<div style="font-size:9px;color:var(--t3)">${a.data}</div>`:''}
+          <div style="width:3px;flex:1;min-height:20px;background:${a.c||'var(--gold)'};border-radius:2px;margin-top:4px"></div>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:700">${a.t||a.titulo||'—'}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+            ${a.cli?`<span style="font-size:10px;background:rgba(61,155,255,.1);color:#3d9bff;padding:1px 7px;border-radius:20px">👤 ${a.cli}</span>`:''}
+            ${a.tec?`<span style="font-size:10px;background:rgba(245,166,35,.1);color:var(--gold);padding:1px 7px;border-radius:20px">👷 ${a.tec}</span>`:''}
+          </div>
+          ${a.obs||a.sub?`<div style="font-size:11px;color:var(--t2);margin-top:3px">${a.obs||a.sub}</div>`:''}
+        </div>
+        ${adm?`<button class="btn br sm" onclick="delAgenda('${p}',${i})" style="padding:3px 7px">🗑️</button>`:''}
+      </div>`).join('');
   });
 }
+
+function delAgenda(p,i){
+  if(!confirm('Remover evento?'))return;
+  const ev=DB.agenda[p][i];
+  if(ev?.id) registrarDelecao(ev.id);
+  DB.agenda[p].splice(i,1);
+  rAgenda(); autoSave(); toast('Evento removido!');
+}
+
+function atualizarCorAgenda(tipo){
+  // Preenche técnicos no select
+  const tsel=$('ag-tec'); if(!tsel) return;
+  tsel.innerHTML='<option value="">— Sem técnico —</option>'
+    +DB.tecnicos.map(t=>`<option>${typeof t==='string'?t:t.nome}</option>`).join('');
+}
+
 
 // ── CENTRAL ───────────────────────────────
 function rCentral(){
@@ -3457,9 +3486,40 @@ const MFRM={
   contrato:`<div class="fg2"><div class="fg"><label>Cliente *</label><select class="fc" id="f0"></select></div><div class="fg"><label>Serviço</label><select class="fc" id="f1"><option>Serviço Recorrente</option><option>Serviço + Monitoramento</option><option>Alarme + Acesso</option><option>Solução Completa</option><option>Serviço</option></select></div></div>
   <div class="fg2"><div class="fg"><label>Valor Mensal (R$) *</label><input class="fc" id="f2" placeholder="2000"></div><div class="fg"><label>Vencimento</label><input class="fc" id="f3" type="month"></div></div>`,
 
-  agenda:`<div class="fg"><label>Título *</label><input class="fc" id="f0" placeholder="Ex: Execução produtos"></div>
-  <div class="fg2"><div class="fg"><label>Data e Hora</label><input class="fc" id="f1" type="datetime-local"></div><div class="fg"><label>Tipo</label><select class="fc" id="f2"><option>Visita / Reunião</option><option>Reunião</option><option>Execução</option><option>Demo</option><option>Manutenção</option></select></div></div>
-  <div class="fg"><label>Cliente</label><select class="fc" id="f3"></select></div>`,
+  agenda:`
+  <div class="fg2">
+    <div class="fg"><label>Tipo de Evento *</label>
+      <select class="fc" id="ag-tipo" onchange="atualizarCorAgenda(this.value)">
+        <option value="reuniao">🤝 Reunião</option>
+        <option value="ligacao">📞 Ligação</option>
+        <option value="visita">🏠 Visita Técnica</option>
+        <option value="instalacao">🔧 Instalação</option>
+        <option value="manutencao">⚙️ Manutenção</option>
+        <option value="entrega">📦 Entrega de Equipamento</option>
+        <option value="vistoria">🔍 Vistoria</option>
+        <option value="outro">📌 Outro</option>
+      </select>
+    </div>
+    <div class="fg"><label>Técnico Responsável</label>
+      <select class="fc" id="ag-tec">
+        <option value="">— Sem técnico —</option>
+      </select>
+    </div>
+  </div>
+  <div class="fg"><label>Título / Descrição *</label>
+    <input class="fc" id="f0" placeholder="Ex: Instalação câmeras, Reunião com cliente, Ligação de retorno">
+  </div>
+  <div class="fg2">
+    <div class="fg"><label>Data e Hora *</label>
+      <input class="fc" id="f1" type="datetime-local">
+    </div>
+    <div class="fg"><label>Cliente</label>
+      <select class="fc" id="f3"></select>
+    </div>
+  </div>
+  <div class="fg"><label>Observações</label>
+    <textarea class="fc" id="ag-obs" rows="2" placeholder="Endereço, contato, detalhes..."></textarea>
+  </div>`,
 
   usuario:`<div class="fg2"><div class="fg"><label>Nome *</label><input class="fc" id="f0" placeholder="Nome completo"></div><div class="fg"><label>Perfil</label><select class="fc" id="f1"><option value="normal">Colaborador</option><option value="admin">Administrador</option></select></div></div>
   <div class="fg2"><div class="fg"><label>Login *</label><input class="fc" id="f2" placeholder="usuario.login"></div><div class="fg"><label>Senha *</label><input class="fc" id="f3" type="password" placeholder="mín. 4 caracteres"></div></div>
@@ -3520,6 +3580,19 @@ const M={
     }
     if($('f0')&&type==='contrato')$('f0').innerHTML=empOpts;
     if($('f3')&&type==='agenda')$('f3').innerHTML=empOpts;
+    if(type==='agenda'){
+      // Popula técnicos
+      const tsel=$('ag-tec');
+      if(tsel) tsel.innerHTML='<option value="">— Sem técnico —</option>'
+        +DB.tecnicos.map(t=>`<option>${typeof t==='string'?t:t.nome}</option>`).join('');
+      // Data padrão = agora
+      const f1=$('f1');
+      if(f1&&!f1.value){
+        const now=new Date();
+        now.setMinutes(Math.ceil(now.getMinutes()/30)*30,0,0);
+        f1.value=now.toISOString().slice(0,16);
+      }
+    }
     // Serviços dinâmicos — lê de DB.adminCfg
     if($('f6'))  $('f6').innerHTML=optsServicos();
     if($('cli-tag')) $('cli-tag').innerHTML=optsServicos();
@@ -3695,12 +3768,37 @@ const M={
       autoSave(); // ← garante que DB._ts é atualizado e envia ao Supabase
 
     }else if(_mtype==='agenda'){
-      const titulo=gv('f0');if(!titulo){toast('⚠️ Informe o título!');return;}
-      const dataRaw=gv('f1'),cli=gv('f3');
-      const hora=dataRaw?new Date(dataRaw).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):nowStr();
-      DB.agenda.h.unshift({h:hora,t:titulo,sub:cli,c:cor});
-      addFeed('📅','rgba(61,155,255,.12)',`Evento: ${titulo}`);
+      const titulo=($('f0')?.value||'').trim();
+      if(!titulo){toast('⚠️ Informe o título!');return;}
+      const tipo=$('ag-tipo')?.value||'outro';
+      const tec=$('ag-tec')?.value||'';
+      const dataRaw=$('f1')?.value||'';
+      const cli=$('f3')?.value||'';
+      const obs=($('ag-obs')?.value||'').trim();
+      const corMap={reuniao:'#3d9bff',ligacao:'#b08fff',visita:'#f5a623',instalacao:'#00d97e',manutencao:'#ff8c42',entrega:'#00C48C',vistoria:'#ff4560',outro:'#7a96bb'};
+      const icMap={reuniao:'🤝',ligacao:'📞',visita:'🏠',instalacao:'🔧',manutencao:'⚙️',entrega:'📦',vistoria:'🔍',outro:'📌'};
+      const corEvento=corMap[tipo]||'#7a96bb';
+      let horaFmt='', dataFmt='';
+      if(dataRaw){
+        const d=new Date(dataRaw);
+        horaFmt=d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+        dataFmt=d.toLocaleDateString('pt-BR');
+      } else {
+        horaFmt=nowStr(); dataFmt=new Date().toLocaleDateString('pt-BR');
+      }
+      const ev={id:uid(),h:horaFmt,data:dataFmt,dataRaw,t:`${icMap[tipo]} ${titulo}`,tipo,tec,sub:cli+(obs?` · ${obs}`:''),c:corEvento,obs,cli};
+      // Verifica se é hoje
+      const hoje=new Date().toLocaleDateString('pt-BR');
+      if(dataFmt===hoje||!dataRaw){
+        DB.agenda.h.unshift(ev);
+      } else {
+        DB.agenda.s.unshift(ev);
+        DB.agenda.s.sort((a,b)=>new Date(a.dataRaw||0)-new Date(b.dataRaw||0));
+      }
+      if(cli) adicionarEvento(cli,'agenda',`${icMap[tipo]} ${tipo}: ${titulo}${tec?' — Técnico: '+tec:''}`,icMap[tipo]);
+      addFeed('📅','rgba(61,155,255,.12)',`Agenda: ${titulo}${cli?' → '+cli:''}`);
       rAgenda(); autoSave();
+      toast(`✅ "${titulo}" adicionado à agenda!`);
 
     }else if(_mtype==='usuario'){
       const nome=gv('f0');if(!nome){toast('⚠️ Informe o nome!');return;}
