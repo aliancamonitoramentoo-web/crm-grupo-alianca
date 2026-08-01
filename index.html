@@ -6559,16 +6559,22 @@ async function jbEnviar(manual=false){
     DB._ts = Date.now();
     salvarLocal();
     const payload={
-      empresas:DB.empresas||[], contatos:DB.contatos||[],
-      deals:DB.deals||[], contratos:DB.contratos||[],
-      os:DB.os||[], tasks:DB.tasks||[], equips:DB.equips||{},
-      orcamentos:DB.orcamentos||[], metas:DB.metas||[],
-      cobrancas:DB.cobrancas||[],
-      comprasClientes:DB.comprasClientes||{},
-      tecnicos:DB.tecnicos||[], movs:DB.movs||[],
-      historico:DB.historico||{},
-      _users:USERS.map(u=>({...u})),  // ← inclui usuários
-      _ts:DB._ts
+      empresas:      DB.empresas||[],
+      contatos:      DB.contatos||[],
+      deals:         DB.deals||[],
+      contratos:     DB.contratos||[],
+      os:            DB.os||[],
+      tasks:         DB.tasks||[],
+      equips:        DB.equips||{},
+      orcamentos:    DB.orcamentos||[],
+      metas:         DB.metas||[],
+      cobrancas:     DB.cobrancas||[],
+      comprasClientes: DB.comprasClientes||{},
+      tecnicos:      DB.tecnicos||[],
+      movs:          DB.movs||[],
+      historico:     DB.historico||{},
+      _users:        USERS.map(u=>({...u})),
+      _ts:           DB._ts
     };
     const r=await fetch(`${_SB_URL}/rest/v1/crm_data?id=eq.alianca`,{
       method:'PATCH',
@@ -6581,19 +6587,61 @@ async function jbEnviar(manual=false){
       body:JSON.stringify({data:payload, updated_at:new Date().toISOString()})
     });
     if(!r.ok){
-      // Se não existe, cria
-      const r2=await fetch(`${_SB_URL}/rest/v1/crm_data`,{
+      await fetch(`${_SB_URL}/rest/v1/crm_data`,{
         method:'POST',
         headers:{'Content-Type':'application/json','apikey':_SB_KEY,'Authorization':'Bearer '+_SB_KEY},
         body:JSON.stringify({id:'alianca',data:payload})
       });
     }
     if(manual) toast('✅ Dados sincronizados!');
-    console.log('☁️ Supabase: enviado OK');
+    console.log('☁️ Supabase OK · ts='+DB._ts);
   } catch(e){
     console.error('Supabase enviar:', e.message);
-    if(manual) toast('❌ Erro: '+e.message);
+    if(manual) toast('❌ Erro ao sincronizar: '+e.message);
   }
+}
+
+// ── Merge inteligente: une local + nuvem sem perder dados ──
+function mergeDB(local, nuvem){
+  // Arrays: une por ID, prioriza o mais recente
+  const camposArray=['empresas','contatos','deals','contratos','os','tasks',
+                     'orcamentos','metas','cobrancas','tecnicos','movs'];
+  camposArray.forEach(k=>{
+    const locArr=local[k]||[];
+    const nuvArr=nuvem[k];
+    if(!nuvArr) return; // nuvem não tem esse campo — mantém local
+
+    if(nuvArr.length===0 && locArr.length>0){
+      // Nuvem vazia mas local tem dados — mantém local (não apaga!)
+      return;
+    }
+    // Une: pega todos IDs da nuvem + locais que não existem na nuvem
+    const idsNuvem=new Set(nuvArr.map(x=>x.id));
+    const somenteLocal=locArr.filter(x=>!idsNuvem.has(x.id));
+    local[k]=[...nuvArr, ...somenteLocal];
+  });
+
+  // Objetos: merge profundo
+  const camposObj=['equips','historico','comprasClientes'];
+  camposObj.forEach(k=>{
+    const locObj=local[k]||{};
+    const nuvObj=nuvem[k];
+    if(!nuvObj) return;
+    // Une as chaves: local tem prioridade se nuvem estiver vazio
+    Object.keys(nuvObj).forEach(chave=>{
+      locObj[chave]=nuvObj[chave];
+    });
+    local[k]=locObj;
+  });
+
+  // Usuários
+  if(nuvem._users?.length){
+    USERS.length=0;
+    nuvem._users.forEach(u=>USERS.push(u));
+  }
+
+  local._ts=nuvem._ts;
+  return local;
 }
 
 async function jbReceber(){
@@ -6606,6 +6654,7 @@ async function jbReceber(){
 
     // Supabase vazio — envia dados locais
     if(!rows?.length||!rows[0]?.data){
+      console.log('☁️ Supabase vazio — enviando dados locais');
       await jbEnviar(false);
       return false;
     }
@@ -6614,29 +6663,23 @@ async function jbReceber(){
     const tsNuvem=p._ts||0;
     const tsLocal=DB._ts||0;
 
-    // Local mais novo — envia para nuvem (inclui deleções)
+    // Local igual ou mais novo — só envia se for mais novo
     if(tsLocal >= tsNuvem){
       if(tsLocal > tsNuvem) await jbEnviar(false);
       return false;
     }
 
-    // Nuvem mais nova — baixa e aplica
-    ['empresas','contatos','deals','contratos','os','tasks',
-     'equips','orcamentos','metas','tecnicos','movs','historico','cobrancas','comprasClientes'].forEach(k=>{
-      if(p[k]!==undefined) DB[k]=p[k];
-    });
-    // Aplica usuários sincronizados
-    if(p._users?.length){
-      USERS.length=0;
-      p._users.forEach(u=>USERS.push(u));
-    }
-    DB._ts=tsNuvem;
-    rTopCli();rPipeline();rClientes();rOS();rTasks();rContratos();
-    rNotifs();
+    // Nuvem mais nova — merge inteligente (nunca apaga dados locais)
+    mergeDB(DB, p);
+    salvarLocal();
+
+    // Atualiza telas abertas
+    rTopCli(); rPipeline(); rClientes(); rOS(); rTasks(); rContratos(); rNotifs();
     if(typeof rOrcamentos==='function') rOrcamentos();
     if(typeof rDashMetas==='function') rDashMetas();
-    salvarLocal();
-    toast('🔄 Dados atualizados!');
+    if(typeof rCobrancas==='function') rCobrancas();
+
+    console.log('☁️ Sync recebido · ts='+tsNuvem);
     return true;
   } catch(e){
     console.error('Supabase receber:', e.message);
@@ -6646,12 +6689,12 @@ async function jbReceber(){
 
 function iniciarSyncJB(){
   clearInterval(_jbTimer);
-  // Ao iniciar: sincroniza imediatamente
+  // Sincroniza logo ao iniciar
   setTimeout(async()=>{ await jbReceber(); }, 1500);
-  // A cada 5 segundos verifica se há dados novos
+  // A cada 5s verifica atualizações
   _jbTimer=setInterval(async()=>{ await jbReceber(); }, 5000);
   _jbSync=true;
-  console.log('☁️ Supabase: sync iniciado (5s)');
+  console.log('☁️ Supabase sync ativo (5s)');
 }
 
 // ═══════════════════════════════════════════════════
