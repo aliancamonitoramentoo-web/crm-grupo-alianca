@@ -7367,31 +7367,48 @@ function abaAgendaTarefas(aba){
 
 // Tipos de meta que o CRM sabe calcular automaticamente
 // ═══════════════════════════════════════════════════
-//  🎯 SISTEMA DE METAS — Total Liberdade + IA
+//  🎯 SISTEMA DE METAS — Vinculado aos Contratos
 // ═══════════════════════════════════════════════════
 
-const META_TIPOS = [
-  {key:'receita',    label:'💰 Receita Mensal',      unid:'R$',  auto:()=>{const r=calcReceita();return r.recTotal;}},
-  {key:'clientes',   label:'👥 Novos Clientes',       unid:'clientes', auto:()=>DB.empresas.length},
-  {key:'os_feitas',  label:'🔧 OS Concluídas',        unid:'OS',  auto:()=>DB.os.filter(o=>o.s==='at').length},
-  {key:'contratos',  label:'📄 Contratos Ativos',     unid:'contratos',auto:()=>DB.contratos.filter(c=>c.s==='at').length},
-  {key:'leads',      label:'🔥 Leads no Funil',       unid:'leads',auto:()=>DB.deals.filter(d=>!d.cancelado).length},
-  {key:'vendas',     label:'🏆 Vendas Fechadas',      unid:'vendas',auto:()=>DB.deals.filter(d=>d.stage===DB.stages.length-1&&!d.cancelado).length},
-  {key:'orcamentos', label:'🧾 Orçamentos Aprovados', unid:'orç.', auto:()=>(DB.orcamentos||[]).filter(o=>o.status==='aprovado').length},
-  {key:'ticket',     label:'🎯 Ticket Médio',         unid:'R$',  auto:()=>{const r=calcReceita();return r.ticketMedio||0;}},
-  {key:'cobrancas',  label:'💸 Cobranças Recebidas',  unid:'R$',  auto:()=>(DB.cobrancas||[]).filter(c=>c.pago).reduce((a,c)=>a+parseFloat(c.valor||0),0)},
-  {key:'livre',      label:'⭐ Meta Livre (manual)',   unid:'un',  auto:()=>0, livre:true},
-];
+// Calcula progresso de uma meta com base nos contratos reais
+function calcValorMeta(meta){
+  if(meta.tipo==='livre') return parseFloat(meta.valorAtual)||0;
+
+  const contratos=DB.contratos.filter(c=>c.s==='at');
+
+  if(meta.tipo==='clientes_contrato'){
+    // Conta clientes com contrato do serviço/palavra-chave definido
+    const filtro=(meta.filtro||'').toLowerCase();
+    if(!filtro) return contratos.length;
+    return contratos.filter(c=>(c.srv||'').toLowerCase().includes(filtro)).length;
+  }
+  if(meta.tipo==='receita_contrato'){
+    // Soma receita dos contratos do serviço definido
+    const filtro=(meta.filtro||'').toLowerCase();
+    if(!filtro) return contratos.reduce((a,c)=>a+parseFloat(c.val||0),0);
+    return contratos.filter(c=>(c.srv||'').toLowerCase().includes(filtro))
+      .reduce((a,c)=>a+parseFloat(c.val||0),0);
+  }
+  if(meta.tipo==='os_feitas')  return DB.os.filter(o=>o.s==='at').length;
+  if(meta.tipo==='vendas')     return DB.deals.filter(d=>d.stage===DB.stages.length-1&&!d.cancelado).length;
+  if(meta.tipo==='receita')    return calcReceita().recTotal;
+  if(meta.tipo==='leads')      return DB.deals.filter(d=>!d.cancelado).length;
+  if(meta.tipo==='cobrancas')  return (DB.cobrancas||[]).filter(c=>c.pago).reduce((a,c)=>a+parseFloat(c.valor||0),0);
+  return parseFloat(meta.valorAtual)||0;
+}
+
+// Retorna clientes que já contribuem para a meta
+function clientesDaMeta(meta){
+  const contratos=DB.contratos.filter(c=>c.s==='at');
+  if(meta.tipo==='clientes_contrato'||meta.tipo==='receita_contrato'){
+    const filtro=(meta.filtro||'').toLowerCase();
+    return contratos.filter(c=>!filtro||(c.srv||'').toLowerCase().includes(filtro));
+  }
+  return [];
+}
 
 function mesAtual(){const d=new Date();return `${d.getMonth()+1}/${d.getFullYear()}`;}
 if(!DB.metas) DB.metas=[];
-
-function calcValorMeta(meta){
-  if(meta.tipo==='livre') return parseFloat(meta.valorAtual)||0;
-  const tipo=META_TIPOS.find(t=>t.key===meta.tipo);
-  if(!tipo) return parseFloat(meta.valorAtual)||0;
-  try{return tipo.auto();}catch(e){return parseFloat(meta.valorAtual)||0;}
-}
 
 function rDashMetas(){
   const el=$('dash-metas'); if(!el) return;
@@ -7403,46 +7420,55 @@ function rDashMetas(){
   }
   el.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px;padding:4px 0">${
     DB.metas.map(meta=>{
-      const tipo=META_TIPOS.find(t=>t.key===meta.tipo);
       const atual=calcValorMeta(meta);
       const alvo=parseFloat(meta.alvo)||1;
       const pct=Math.min(Math.round(atual/alvo*100),100);
       const bateu=atual>=alvo;
       const cor=bateu?'var(--green)':pct>=70?'var(--gold)':pct>=40?'var(--orange)':'var(--red)';
-      const isR=(tipo?.unid==='R$'||meta.unid==='R$');
-      const fmtV=v=>isR?fmtR(Math.round(v)):`${v} ${meta.unid||tipo?.unid||''}`.trim();
-      const isLivre=meta.tipo==='livre'||!META_TIPOS.find(t=>t.key===meta.tipo&&!t.livre);
+      const isR=(meta.tipo==='receita'||meta.tipo==='receita_contrato'||meta.tipo==='cobrancas'||meta.unid==='R$');
+      const fmtV=v=>isR?fmtR(Math.round(v)):`${v} ${meta.unid||''}`.trim();
+
+      // Clientes vinculados (contratos que já contribuem)
+      const clisVinc=clientesDaMeta(meta);
+
       return `<div style="background:var(--s2);border-radius:13px;padding:14px;border-left:4px solid ${cor};position:relative">
         <div style="position:absolute;top:10px;right:10px;display:flex;gap:5px">
           <button onclick="editarMeta(${meta.id})" style="background:var(--s1);border:1px solid var(--bd);color:var(--t2);border-radius:6px;padding:2px 7px;cursor:pointer;font-size:11px">✏️</button>
           <button onclick="removerMeta(${meta.id})" style="background:rgba(255,69,96,.1);border:1px solid rgba(255,69,96,.2);color:var(--red);border-radius:6px;padding:2px 7px;cursor:pointer;font-size:11px">✕</button>
         </div>
         <div style="font-size:13px;font-weight:800;padding-right:70px;margin-bottom:2px">${meta.nome}</div>
-        ${meta.desc?`<div style="font-size:11px;color:var(--t3);margin-bottom:8px">${meta.desc}</div>`:'<div style="margin-bottom:8px"></div>'}
+        ${meta.filtro?`<div style="font-size:10px;color:var(--t3);margin-bottom:6px">🔍 Filtro: <strong style="color:var(--gold)">${meta.filtro}</strong></div>`:''}
         <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:6px">
-          <div style="font-size:22px;font-weight:900;color:${cor}">${fmtV(atual)}</div>
-          <div style="text-align:right"><div style="font-size:11px;color:var(--t3)">meta</div><div style="font-size:15px;font-weight:700">${fmtV(alvo)}</div></div>
+          <div style="font-size:24px;font-weight:900;color:${cor}">${fmtV(atual)}</div>
+          <div style="text-align:right"><div style="font-size:10px;color:var(--t3)">meta</div><div style="font-size:15px;font-weight:700">${fmtV(alvo)}</div></div>
         </div>
         <div style="background:var(--s1);border-radius:20px;height:10px;overflow:hidden;margin-bottom:6px">
           <div style="width:${pct}%;height:100%;background:${cor};border-radius:20px;transition:width .5s ease"></div>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
           <span style="font-size:12px;color:${cor};font-weight:800">${pct}% ${bateu?'✅ BATIDA!':''}</span>
           <span style="font-size:11px;color:var(--t3)">falta: ${bateu?'0':fmtV(Math.max(0,alvo-atual))}</span>
         </div>
-        ${isLivre?`<div style="margin-top:10px;border-top:1px solid var(--bd);padding-top:8px">
-          <div style="font-size:10px;color:var(--t3);margin-bottom:5px">ATUALIZAR PROGRESSO</div>
+        ${clisVinc.length?`<div style="border-top:1px solid var(--bd);padding-top:8px;margin-top:2px">
+          <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px">Clientes ativos nesta meta (${clisVinc.length})</div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px">
+            ${clisVinc.slice(0,6).map(c=>`<span style="background:var(--s1);border:1px solid var(--bd);border-radius:20px;padding:2px 8px;font-size:10px;color:var(--t2)">${c.cli} · ${fmtR(c.val)}</span>`).join('')}
+            ${clisVinc.length>6?`<span style="font-size:10px;color:var(--t3);padding:2px 4px">+${clisVinc.length-6} mais</span>`:''}
+          </div>
+        </div>`:''}
+        ${meta.tipo==='livre'?`<div style="border-top:1px solid var(--bd);padding-top:8px;margin-top:4px">
+          <div style="font-size:10px;color:var(--t3);margin-bottom:5px">ATUALIZAR PROGRESSO MANUAL</div>
           <div style="display:flex;gap:6px;align-items:center">
             <input type="number" value="${meta.valorAtual||0}" min="0"
               style="flex:1;padding:6px 9px;font-size:13px;background:var(--s1);border:1px solid var(--bd);border-radius:8px;color:var(--t1);font-weight:700"
               onchange="atualizarMetaLivre(${meta.id},this.value)"
               oninput="atualizarMetaLivre(${meta.id},this.value)">
-            <span style="font-size:12px;color:var(--t2);font-weight:600">${meta.unid||'un'}</span>
-            <button onclick="analisarMetaIA(${meta.id})" style="background:rgba(61,155,255,.15);border:1px solid rgba(61,155,255,.3);color:#3d9bff;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:11px;font-weight:700">🤖 IA</button>
+            <span style="font-size:12px;color:var(--t2)">${meta.unid||'un'}</span>
           </div>
-        </div>`:`<div style="margin-top:8px">
-          <button onclick="analisarMetaIA(${meta.id})" style="width:100%;background:rgba(61,155,255,.1);border:1px solid rgba(61,155,255,.25);color:#3d9bff;border-radius:8px;padding:6px;cursor:pointer;font-size:11px;font-weight:700">🤖 Analisar com IA</button>
+        </div>`:`<div style="font-size:10px;color:var(--t3);margin-top:6px;text-align:center">
+          🔄 Atualiza automaticamente com base nos contratos
         </div>`}
+        <button onclick="analisarMetaIA(${meta.id})" style="width:100%;margin-top:8px;background:rgba(61,155,255,.1);border:1px solid rgba(61,155,255,.25);color:#3d9bff;border-radius:8px;padding:7px;cursor:pointer;font-size:11px;font-weight:700">🤖 Analisar com IA</button>
       </div>`;
     }).join('')
   }</div>`;
@@ -7451,131 +7477,49 @@ function rDashMetas(){
 function atualizarMetaLivre(id, val){
   const m=DB.metas.find(x=>x.id===id); if(!m) return;
   m.valorAtual=parseFloat(val)||0;
-  m.ultimaAtualizacao=nowStr();
   rDashMetas(); autoSave();
-}
-
-async function analisarMetaIA(id){
-  const m=DB.metas.find(x=>x.id===id); if(!m) return;
-
-  if(!_apiKey){
-    toast('⚠️ Configure sua chave de IA em ⚙️ Configurações → Inteligência IA');
-    go('config');return;
-  }
-
-  const atual=calcValorMeta(m);
-  const alvo=parseFloat(m.alvo)||1;
-  const pct=Math.min(Math.round(atual/alvo*100),100);
-  const r=calcReceita();
-  const osFeitas=DB.os.filter(o=>o.s==='at').length;
-  const vendas=DB.deals.filter(d=>d.stage===DB.stages.length-1&&!d.cancelado).length;
-
-  const prompt=`Analise esta meta de uma empresa de segurança eletrônica e dê sugestões práticas:
-
-META: "${m.nome}"
-${m.desc?`Descrição: ${m.desc}`:''}
-Unidade: ${m.unid||'un'}
-Progresso: ${atual} de ${alvo} (${pct}%)
-Mês: ${m.mes||mesAtual()}
-Status: ${pct>=100?'✅ BATIDA!':pct>=70?'⚡ Quase lá':pct>=40?'⚠️ No meio':'🚨 Precisa acelerar'}
-
-Contexto atual do negócio:
-- Receita: ${fmtR(r.recTotal)}
-- Clientes: ${DB.empresas.length}
-- Contratos ativos: ${DB.contratos.filter(c=>c.s==='at').length}
-- OS concluídas: ${osFeitas}
-- Vendas fechadas: ${vendas}
-- Leads no funil: ${DB.deals.filter(d=>!d.cancelado).length}
-
-Responda com:
-1. Uma análise rápida do progresso (2 linhas)
-2. Três ações práticas para atingir a meta
-3. Um alerta ou dica importante
-
-Seja direto e use dados do negócio. Máximo 150 palavras.`;
-
-  // Mostra modal de carregamento
-  $('mod-title').innerHTML='🤖 Analisando Meta com IA...';
-  $('mod-body').innerHTML=`<div style="text-align:center;padding:24px">
-    <div style="font-size:32px;margin-bottom:12px">🤖</div>
-    <div style="font-size:14px;color:var(--t2)">Analisando "${m.nome}"...</div>
-    <div style="font-size:12px;color:var(--t3);margin-top:6px">Consultando IA...</div>
-  </div>`;
-  const btn=$('mod-save-btn');if(btn)btn.style.display='none';
-  $('MOD').classList.add('open');
-
-  try{
-    const analise=await chamarClaude(prompt, 400, 'Você é um consultor de negócios especialista em segurança eletrônica. Seja objetivo, prático e direto. Responda sempre em português do Brasil.');
-
-    $('mod-title').innerHTML=`🤖 Análise de Meta — ${m.nome}`;
-    $('mod-body').innerHTML=`
-      <div style="background:rgba(61,155,255,.08);border:1px solid rgba(61,155,255,.2);border-radius:11px;padding:12px;margin-bottom:12px">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-          <div>
-            <div style="font-size:12px;font-weight:700;color:#3d9bff">${m.nome}</div>
-            <div style="font-size:11px;color:var(--t3)">${m.mes||mesAtual()} · ${m.unid||'un'}</div>
-          </div>
-          <div style="text-align:right">
-            <div style="font-size:22px;font-weight:900;color:${pct>=100?'var(--green)':pct>=70?'var(--gold)':pct>=40?'var(--orange)':'var(--red)'}">${pct}%</div>
-            <div style="font-size:11px;color:var(--t3)">${atual} / ${alvo}</div>
-          </div>
-        </div>
-        <div style="background:var(--s1);border-radius:20px;height:8px;overflow:hidden;margin-top:8px">
-          <div style="width:${pct}%;height:100%;background:${pct>=100?'var(--green)':pct>=70?'var(--gold)':pct>=40?'var(--orange)':'var(--red)'};border-radius:20px"></div>
-        </div>
-      </div>
-      <div style="font-size:13px;line-height:1.8;color:var(--t1);white-space:pre-wrap">${analise}</div>
-      <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--bd);font-size:10px;color:var(--t3);text-align:center">🤖 Gerado por Claude AI · ${new Date().toLocaleString('pt-BR')}</div>`;
-
-    if(btn){btn.style.display='';btn.textContent='Fechar';btn.onclick=()=>{btn.textContent='Salvar';btn.onclick=()=>M.save();M.close();};}
-  }catch(e){
-    $('mod-body').innerHTML=`<div style="text-align:center;padding:20px;color:var(--red)">
-      <div style="font-size:28px;margin-bottom:8px">❌</div>
-      <div style="font-size:13px;font-weight:700">Erro ao consultar IA</div>
-      <div style="font-size:12px;color:var(--t2);margin-top:6px">${e.message}</div>
-      <div style="font-size:11px;color:var(--t3);margin-top:8px">Verifique sua chave de API em ⚙️ Configurações → Inteligência IA</div>
-    </div>`;
-    if(btn){btn.style.display='';btn.textContent='Fechar';btn.onclick=()=>{btn.textContent='Salvar';btn.onclick=()=>M.save();M.close();};}
-  }
 }
 
 function abrirGerenciarMetas(){
   $('mod-title').innerHTML='🎯 Gerenciar Metas';
-  const tipoOpts=META_TIPOS.map(t=>`<option value="${t.key}">${t.label}</option>`).join('');
   $('mod-body').innerHTML=`
     <div style="margin-bottom:14px">
       <div style="font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Metas Ativas (${DB.metas?.length||0})</div>
-      <div id="metas-lista" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto"></div>
+      <div id="metas-lista" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto"></div>
     </div>
     <div style="background:var(--s2);border-radius:11px;padding:14px">
       <div style="font-size:12px;font-weight:700;color:var(--t2);margin-bottom:12px">➕ Nova Meta</div>
       <div class="fg" style="margin:0 0 8px">
         <label>Nome da Meta *</label>
-        <input class="fc" id="nm-nome" placeholder="Ex: Fechar 15 OS, Bater R$20.000, 5 novos clientes">
+        <input class="fc" id="nm-nome" placeholder="Ex: Monitoramento, Manutenção Preventiva, Receita Mensal">
       </div>
-      <div class="fg2" style="margin:0 0 8px">
-        <div class="fg" style="margin:0">
-          <label>Tipo (o CRM calcula automaticamente)</label>
-          <select class="fc" id="nm-tipo" onchange="atualizarCamposMeta(this.value)">${tipoOpts}</select>
-        </div>
-        <div class="fg" style="margin:0">
-          <label>Unidade <span style="color:var(--t3)">(ex: OS, R$, clientes)</span></label>
-          <input class="fc" id="nm-unid" placeholder="OS">
-        </div>
+      <div class="fg" style="margin:0 0 8px">
+        <label>Tipo da Meta</label>
+        <select class="fc" id="nm-tipo" onchange="atualizarCamposMeta(this.value)">
+          <option value="clientes_contrato">👥 Nº de Clientes por Contrato (conta automaticamente)</option>
+          <option value="receita_contrato">💰 Receita por Tipo de Contrato (soma automaticamente)</option>
+          <option value="receita">📈 Receita Total do Mês (automático)</option>
+          <option value="os_feitas">🔧 OS Concluídas (automático)</option>
+          <option value="vendas">🏆 Vendas Fechadas (automático)</option>
+          <option value="leads">🔥 Leads no Funil (automático)</option>
+          <option value="livre">⭐ Meta Livre (você atualiza manualmente)</option>
+        </select>
+      </div>
+      <div class="fg" id="nm-filtro-box" style="margin:0 0 8px">
+        <label>🔍 Palavra-chave do Serviço <span style="color:var(--t3)">(ex: monitoramento, manutenção, câmera)</span></label>
+        <input class="fc" id="nm-filtro" placeholder="Ex: monitoramento · manutenção · cerca · alarme · câmera">
+        <div style="font-size:10px;color:var(--t3);margin-top:4px">O CRM vai filtrar contratos que contenham essa palavra no nome do serviço</div>
       </div>
       <div class="fg2" style="margin:0 0 8px">
         <div class="fg" style="margin:0"><label>Valor Alvo *</label>
-          <input class="fc" id="nm-alvo" type="number" min="1" placeholder="Ex: 20">
+          <input class="fc" id="nm-alvo" type="number" min="1" placeholder="Ex: 4 clientes ou R$ 5000">
         </div>
-        <div class="fg" style="margin:0"><label>Mês de Referência</label>
-          <input class="fc" id="nm-mes" value="${mesAtual()}" placeholder="Ex: 8/2026">
+        <div class="fg" style="margin:0"><label>Unidade</label>
+          <input class="fc" id="nm-unid" placeholder="clientes, R$, OS...">
         </div>
       </div>
       <div class="fg" style="margin:0 0 10px"><label>Descrição (opcional)</label>
-        <input class="fc" id="nm-desc" placeholder="Ex: Crescer base de clientes do setor comercial">
-      </div>
-      <div id="nm-livre-box" style="display:none;background:rgba(245,166,35,.07);border-radius:8px;padding:10px;margin-bottom:10px;font-size:12px;color:var(--gold)">
-        ⭐ Meta Livre — você atualiza o progresso manualmente direto no Dashboard
+        <input class="fc" id="nm-desc" placeholder="Ex: 4 clientes de monitoramento a R$1.000/mês">
       </div>
       <button class="btn bg" onclick="salvarNovaMeta()" style="width:100%;justify-content:center">✅ Adicionar Meta</button>
     </div>`;
@@ -7583,14 +7527,20 @@ function abrirGerenciarMetas(){
   const btn=$('mod-save-btn'); if(btn) btn.style.display='none';
   $('MOD').classList.add('open');
   $('MOD').onclick=ev=>{if(ev.target===$('MOD')){const b=$('mod-save-btn');if(b)b.style.display='';$('MOD').onclick=null;$('MOD').classList.remove('open');}};
+  // Inicializa campos
+  atualizarCamposMeta('clientes_contrato');
 }
 
 function atualizarCamposMeta(tipo){
-  const box=$('nm-livre-box');
-  const tipoObj=META_TIPOS.find(t=>t.key===tipo);
-  if(box) box.style.display=(tipo==='livre')?'':'none';
+  const box=$('nm-filtro-box');
   const unidEl=$('nm-unid');
-  if(unidEl&&tipoObj?.unid&&tipo!=='livre') unidEl.value=tipoObj.unid;
+  if(!box) return;
+  const semFiltro=['receita','os_feitas','vendas','leads','livre'];
+  box.style.display=semFiltro.includes(tipo)?'none':'';
+  if(unidEl){
+    const unids={clientes_contrato:'clientes',receita_contrato:'R$',receita:'R$',os_feitas:'OS',vendas:'vendas',leads:'leads',livre:'un'};
+    unidEl.value=unids[tipo]||'un';
+  }
 }
 
 function renderListaMetas(){
@@ -7600,10 +7550,12 @@ function renderListaMetas(){
     const atual=calcValorMeta(m);
     const pct=Math.min(Math.round(atual/(parseFloat(m.alvo)||1)*100),100);
     const cor=pct>=100?'var(--green)':pct>=70?'var(--gold)':'var(--orange)';
+    const isR=(m.tipo==='receita'||m.tipo==='receita_contrato'||m.tipo==='cobrancas'||m.unid==='R$');
+    const fmtV=v=>isR?fmtR(Math.round(v)):`${v} ${m.unid||''}`.trim();
     return `<div style="display:flex;align-items:center;gap:8px;background:var(--s1);border-radius:9px;padding:9px 12px">
       <div style="flex:1">
-        <div style="font-size:12px;font-weight:700">${m.nome}</div>
-        <div style="font-size:10px;color:var(--t3)">${m.mes||mesAtual()} · ${atual} / ${m.alvo} ${m.unid||''}</div>
+        <div style="font-size:12px;font-weight:700">${m.nome} ${m.filtro?`<span style="font-size:10px;color:var(--gold)">[${m.filtro}]</span>`:''}</div>
+        <div style="font-size:10px;color:var(--t3)">${fmtV(atual)} / ${fmtV(m.alvo)} · ${m.tipo}</div>
       </div>
       <div style="font-size:14px;font-weight:900;color:${cor}">${pct}%</div>
       <button onclick="editarMeta(${m.id});$('MOD').classList.remove('open')" style="background:var(--s2);border:1px solid var(--bd);color:var(--t2);border-radius:6px;padding:3px 7px;cursor:pointer;font-size:11px">✏️</button>
@@ -7617,16 +7569,15 @@ function salvarNovaMeta(){
   const tipo=$('nm-tipo')?.value||'livre';
   const alvo=parseFloat($('nm-alvo')?.value)||0;
   const unid=($('nm-unid')?.value||'').trim();
+  const filtro=($('nm-filtro')?.value||'').trim().toLowerCase();
   const desc=($('nm-desc')?.value||'').trim();
-  const mes=($('nm-mes')?.value||mesAtual()).trim();
   if(!nome){toast('⚠️ Informe o nome da meta!');return;}
   if(!alvo){toast('⚠️ Informe o valor alvo!');return;}
   if(!DB.metas) DB.metas=[];
-  const tipoObj=META_TIPOS.find(t=>t.key===tipo);
-  DB.metas.push({id:uid(),nome,tipo,alvo,unid:unid||(tipoObj?.unid||'un'),desc,mes,valorAtual:0,criadoEm:nowStr()});
+  DB.metas.push({id:uid(),nome,tipo,alvo,unid,filtro,desc,valorAtual:0,mes:mesAtual(),criadoEm:nowStr()});
   renderListaMetas();rDashMetas();autoSave();
-  ['nm-nome','nm-alvo','nm-desc','nm-unid'].forEach(i=>{const e=$(i);if(e)e.value='';});
-  toast('✅ Meta adicionada no Dashboard!');
+  ['nm-nome','nm-alvo','nm-desc','nm-filtro','nm-unid'].forEach(i=>{const e=$(i);if(e)e.value='';});
+  toast('✅ Meta criada! Aparece no Dashboard e atualiza automaticamente.');
 }
 
 function editarMeta(id){
@@ -7634,27 +7585,24 @@ function editarMeta(id){
   $('mod-title').innerHTML='✏️ Editar Meta';
   $('mod-body').innerHTML=`
     <div class="fg"><label>Nome</label><input class="fc" id="em-nome" value="${m.nome}"></div>
+    <div class="fg"><label>Palavra-chave do serviço</label><input class="fc" id="em-filtro" value="${m.filtro||''}" placeholder="Ex: monitoramento"></div>
     <div class="fg2">
       <div class="fg"><label>Valor Alvo</label><input class="fc" id="em-alvo" type="number" value="${m.alvo}"></div>
       <div class="fg"><label>Unidade</label><input class="fc" id="em-unid" value="${m.unid||''}"></div>
     </div>
-    <div class="fg2">
-      <div class="fg"><label>Mês</label><input class="fc" id="em-mes" value="${m.mes||mesAtual()}"></div>
-      <div class="fg"><label>Valor Atual (meta livre)</label><input class="fc" id="em-atual" type="number" value="${m.valorAtual||0}"></div>
-    </div>
+    ${m.tipo==='livre'?`<div class="fg"><label>Progresso Atual (manual)</label><input class="fc" id="em-atual" type="number" value="${m.valorAtual||0}"></div>`:''}
     <div class="fg"><label>Descrição</label><input class="fc" id="em-desc" value="${m.desc||''}"></div>`;
   $('mod-save-btn').textContent='💾 Salvar';
   $('mod-save-btn').style.display='';
   $('mod-save-btn').onclick=()=>{
     m.nome=($('em-nome')?.value||'').trim()||m.nome;
+    m.filtro=($('em-filtro')?.value||'').trim().toLowerCase();
     m.alvo=parseFloat($('em-alvo')?.value)||m.alvo;
     m.unid=($('em-unid')?.value||'').trim()||m.unid;
-    m.mes=($('em-mes')?.value||'').trim()||m.mes;
     m.valorAtual=parseFloat($('em-atual')?.value)||0;
     m.desc=($('em-desc')?.value||'').trim();
     rDashMetas();autoSave();
-    $('mod-save-btn').textContent='Salvar';
-    $('mod-save-btn').onclick=()=>M.save();
+    $('mod-save-btn').textContent='Salvar';$('mod-save-btn').onclick=()=>M.save();
     M.close();toast('✅ Meta atualizada!');
   };
   $('MOD').classList.add('open');
@@ -7665,6 +7613,10 @@ function removerMeta(id){
   DB.metas=DB.metas.filter(m=>m.id!==id);
   renderListaMetas();rDashMetas();autoSave();toast('Meta removida!');
 }
+
+
+
+if(!DB.metas) DB.metas=[];
 
 
 // ── Cadastro de Cliente — Função dedicada sem depender de M.save() ──
