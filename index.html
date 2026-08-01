@@ -7457,74 +7457,86 @@ function atualizarMetaLivre(id, val){
 
 async function analisarMetaIA(id){
   const m=DB.metas.find(x=>x.id===id); if(!m) return;
+
+  if(!_apiKey){
+    toast('⚠️ Configure sua chave de IA em ⚙️ Configurações → Inteligência IA');
+    go('config');return;
+  }
+
   const atual=calcValorMeta(m);
   const alvo=parseFloat(m.alvo)||1;
   const pct=Math.min(Math.round(atual/alvo*100),100);
   const r=calcReceita();
+  const osFeitas=DB.os.filter(o=>o.s==='at').length;
+  const vendas=DB.deals.filter(d=>d.stage===DB.stages.length-1&&!d.cancelado).length;
 
-  const prompt=`Você é consultor de negócios especialista em segurança eletrônica. Analise brevemente esta meta e dê 2-3 sugestões práticas e diretas em português:
+  const prompt=`Analise esta meta de uma empresa de segurança eletrônica e dê sugestões práticas:
 
 META: "${m.nome}"
 ${m.desc?`Descrição: ${m.desc}`:''}
-Progresso: ${atual} de ${alvo} ${m.unid||''} (${pct}%)
-${pct>=100?'✅ META BATIDA!':pct>=70?'⚡ Perto de bater':pct>=40?'⚠️ No meio do caminho':'🚨 Precisa acelerar'}
+Unidade: ${m.unid||'un'}
+Progresso: ${atual} de ${alvo} (${pct}%)
+Mês: ${m.mes||mesAtual()}
+Status: ${pct>=100?'✅ BATIDA!':pct>=70?'⚡ Quase lá':pct>=40?'⚠️ No meio':'🚨 Precisa acelerar'}
 
-Contexto do negócio:
-- Receita atual: ${fmtR(r.recTotal)}
-- Clientes ativos: ${DB.empresas.length}
-- Contratos: ${DB.contratos.filter(c=>c.s==='at').length}
+Contexto atual do negócio:
+- Receita: ${fmtR(r.recTotal)}
+- Clientes: ${DB.empresas.length}
+- Contratos ativos: ${DB.contratos.filter(c=>c.s==='at').length}
+- OS concluídas: ${osFeitas}
+- Vendas fechadas: ${vendas}
 - Leads no funil: ${DB.deals.filter(d=>!d.cancelado).length}
 
-Responda em até 120 palavras, direto ao ponto, sem introdução.`;
+Responda com:
+1. Uma análise rápida do progresso (2 linhas)
+2. Três ações práticas para atingir a meta
+3. Um alerta ou dica importante
 
-  // Mostra loader no botão
-  const btn=document.querySelector(`[onclick="analisarMetaIA(${id})"]`);
-  if(btn){btn.textContent='🤖 Analisando...';btn.disabled=true;}
+Seja direto e use dados do negócio. Máximo 150 palavras.`;
+
+  // Mostra modal de carregamento
+  $('mod-title').innerHTML='🤖 Analisando Meta com IA...';
+  $('mod-body').innerHTML=`<div style="text-align:center;padding:24px">
+    <div style="font-size:32px;margin-bottom:12px">🤖</div>
+    <div style="font-size:14px;color:var(--t2)">Analisando "${m.nome}"...</div>
+    <div style="font-size:12px;color:var(--t3);margin-top:6px">Consultando IA...</div>
+  </div>`;
+  const btn=$('mod-save-btn');if(btn)btn.style.display='none';
+  $('MOD').classList.add('open');
 
   try{
-    const res=await fetch('/api/anthropic',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-6',
-        max_tokens:300,
-        messages:[{role:'user',content:prompt}]
-      })
-    });
-    let analise='';
-    if(res.ok){
-      const data=await res.json();
-      analise=data.content?.[0]?.text||'';
-    } else {
-      // Fallback direto à API Anthropic
-      const res2=await fetch('https://api.anthropic.com/v1/messages',{
-        method:'POST',
-        headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01'},
-        body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:300,messages:[{role:'user',content:prompt}]})
-      });
-      const data2=await res2.json();
-      analise=data2.content?.[0]?.text||'Não foi possível conectar à IA.';
-    }
+    const analise=await chamarClaude(prompt, 400, 'Você é um consultor de negócios especialista em segurança eletrônica. Seja objetivo, prático e direto. Responda sempre em português do Brasil.');
 
-    // Mostra resultado no modal
-    $('mod-title').innerHTML='🤖 Análise de Meta — IA';
+    $('mod-title').innerHTML=`🤖 Análise de Meta — ${m.nome}`;
     $('mod-body').innerHTML=`
-      <div style="background:rgba(61,155,255,.08);border:1px solid rgba(61,155,255,.2);border-radius:11px;padding:14px;margin-bottom:12px">
-        <div style="font-size:11px;font-weight:700;color:#3d9bff;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">🎯 ${m.nome}</div>
-        <div style="display:flex;gap:16px;font-size:12px;color:var(--t2)">
-          <span>Progresso: <strong style="color:${pct>=100?'var(--green)':pct>=70?'var(--gold)':'var(--orange)'}">${pct}%</strong></span>
-          <span>Atual: <strong>${atual} ${m.unid||''}</strong></span>
-          <span>Meta: <strong>${alvo} ${m.unid||''}</strong></span>
+      <div style="background:rgba(61,155,255,.08);border:1px solid rgba(61,155,255,.2);border-radius:11px;padding:12px;margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <div>
+            <div style="font-size:12px;font-weight:700;color:#3d9bff">${m.nome}</div>
+            <div style="font-size:11px;color:var(--t3)">${m.mes||mesAtual()} · ${m.unid||'un'}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:22px;font-weight:900;color:${pct>=100?'var(--green)':pct>=70?'var(--gold)':pct>=40?'var(--orange)':'var(--red)'}">${pct}%</div>
+            <div style="font-size:11px;color:var(--t3)">${atual} / ${alvo}</div>
+          </div>
+        </div>
+        <div style="background:var(--s1);border-radius:20px;height:8px;overflow:hidden;margin-top:8px">
+          <div style="width:${pct}%;height:100%;background:${pct>=100?'var(--green)':pct>=70?'var(--gold)':pct>=40?'var(--orange)':'var(--red)'};border-radius:20px"></div>
         </div>
       </div>
-      <div style="font-size:13px;line-height:1.7;color:var(--t1);white-space:pre-line">${analise}</div>`;
-    const savBtn=$('mod-save-btn');
-    if(savBtn){savBtn.textContent='Fechar';savBtn.onclick=()=>{savBtn.textContent='Salvar';savBtn.onclick=()=>M.save();M.close();};}
-    $('MOD').classList.add('open');
+      <div style="font-size:13px;line-height:1.8;color:var(--t1);white-space:pre-wrap">${analise}</div>
+      <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--bd);font-size:10px;color:var(--t3);text-align:center">🤖 Gerado por Claude AI · ${new Date().toLocaleString('pt-BR')}</div>`;
+
+    if(btn){btn.style.display='';btn.textContent='Fechar';btn.onclick=()=>{btn.textContent='Salvar';btn.onclick=()=>M.save();M.close();};}
   }catch(e){
-    toast('❌ Erro na IA: '+e.message);
+    $('mod-body').innerHTML=`<div style="text-align:center;padding:20px;color:var(--red)">
+      <div style="font-size:28px;margin-bottom:8px">❌</div>
+      <div style="font-size:13px;font-weight:700">Erro ao consultar IA</div>
+      <div style="font-size:12px;color:var(--t2);margin-top:6px">${e.message}</div>
+      <div style="font-size:11px;color:var(--t3);margin-top:8px">Verifique sua chave de API em ⚙️ Configurações → Inteligência IA</div>
+    </div>`;
+    if(btn){btn.style.display='';btn.textContent='Fechar';btn.onclick=()=>{btn.textContent='Salvar';btn.onclick=()=>M.save();M.close();};}
   }
-  if(btn){btn.textContent='🤖 Analisar com IA';btn.disabled=false;}
 }
 
 function abrirGerenciarMetas(){
