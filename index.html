@@ -481,7 +481,7 @@ tr:hover td{background:rgba(255,255,255,.017);}
       📤 Importar CSV
       <input type="file" accept=".csv,.xlsx,.xls" style="display:none" onchange="iniciarImportacaoCSV(this)">
     </label>
-    <button class="btn bg" style="margin-left:auto" onclick="M.open('cliente')">+ Novo Cliente</button>
+    <button class="btn bg" style="margin-left:auto" onclick="abrirCadastroCliente()">+ Novo Cliente</button>
   </div>
 
   <!-- Cards de clientes -->
@@ -7210,6 +7210,87 @@ function salvarNovaMeta(){
 function removerMeta(id){
   DB.metas=DB.metas.filter(m=>m.id!==id);
   renderListaMetas(); rDashMetas(); autoSave(); toast('Meta removida!');
+}
+
+
+// ── Cadastro de Cliente — Função dedicada sem depender de M.save() ──
+function abrirCadastroCliente(){
+  if(!isAdmin()){toast('⛔ Apenas administradores podem cadastrar clientes!');return;}
+  _mtype='cliente';
+  $('mod-title').textContent='👤 Novo Cliente';
+  $('mod-body').innerHTML=MFRM['cliente']||'';
+  // Preenche serviços
+  if($('cli-tag')) $('cli-tag').innerHTML=optsServicos();
+  // Configura botão salvar dedicado
+  const btn=$('mod-save-btn');
+  if(btn){
+    btn.textContent='💾 Cadastrar Cliente';
+    btn.onclick=()=>salvarCliente();
+  }
+  $('MOD').classList.add('open');
+}
+
+function salvarCliente(){
+  const nome=($('cli-nome')?.value||'').trim();
+  if(!nome){toast('⚠️ Informe o nome do cliente!');return;}
+
+  const tipo=$('cli-tipo')?.value||'pj';
+  const doc=($('cli-doc')?.value||'').trim();
+  const cargo=($('cli-cargo')?.value||'').trim();
+  const tel=($('cli-tel')?.value||'').trim();
+  const tel2=($('cli-tel2')?.value||'').trim();
+  const email=($('cli-email')?.value||'').trim();
+  const bairro=($('cli-bairro')?.value||'').trim();
+  const cidade=($('cli-cidade')?.value||'').trim();
+  const rua=($('cli-rua')?.value||'').trim();
+  const num=($('cli-num')?.value||'').trim();
+  const ref=($('cli-ref')?.value||'').trim();
+  const nasc=($('cli-nasc')?.value||'');
+  const obs=($('cli-obs')?.value||'').trim();
+  const temVenda=$('cli-tem-venda')?.checked||false;
+
+  // Verifica duplicidade
+  if(DB.empresas.find(e=>e.nome.toLowerCase()===nome.toLowerCase())){
+    toast('⚠️ Já existe um cliente com esse nome!');return;
+  }
+
+  const corCli=avc(DB.empresas.length);
+  const eid=uid();
+
+  DB.empresas.push({
+    id:eid,nome,contato:cargo,tel,tel2,email,
+    bairro,cidade,rua,num,ref,s:'pr',val:0,
+    cor:corCli,tag:'mo',tipo,doc,nasc,obs
+  });
+  DB.contatos.push({
+    id:uid(),tipo,nome,doc,cargo,tel,tel2,email,
+    bairro,cidade,rua,num,ref,nasc,obs,
+    emp:tipo==='pj'?nome:'',s:'pr'
+  });
+
+  if(temVenda){
+    const tag=($('cli-tag')?.value)||'sv';
+    const valRaw=($('cli-val')?.value||'').replace(/\D/g,'');
+    const val=parseInt(valRaw)||0;
+    const stage=parseInt($('cli-stage')?.value||'0');
+    const ini=(CU?.nome||'GA').substring(0,2).toUpperCase();
+    DB.deals.push({id:uid(),emp:nome,val:String(val),tag,stage,ini,cor:corCli});
+    DB.notifs.unshift({ic:'🔥',t:`Novo lead: ${nome}`,sub:`${TAGL[tag]||tag}`,time:nowStr(),tipo:'unread'});
+    addFeed('🔥','rgba(245,166,35,.12)',`Lead: ${nome}`);
+  } else {
+    addFeed('👥','rgba(176,143,255,.12)',`Cliente: ${nome} (${tipo.toUpperCase()})`);
+  }
+
+  DB.notifs.unshift({ic:'👥',t:`Novo cliente: ${nome}`,sub:tipo==='pf'?'Pessoa Física':'Pessoa Jurídica',time:nowStr(),tipo:'unread'});
+  adicionarEvento(nome,'geral','Cliente cadastrado','👥');
+
+  rClientes();rPipeline();rMapa();rNotifs();updKPI();autoSave();
+
+  // Reseta botão e fecha modal
+  const btn=$('mod-save-btn');
+  if(btn){btn.textContent='Salvar';btn.onclick=()=>M.save();}
+  M.close();
+  toast(`✅ ${nome} cadastrado com sucesso!${temVenda?' + Venda no Pipeline':''}`);
 }
 
 
