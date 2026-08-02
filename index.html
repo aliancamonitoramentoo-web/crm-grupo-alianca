@@ -1499,9 +1499,10 @@ function calcReceita(){
   const recContratos=contratosAtivos.reduce((a,c)=>a+parseR(c.val),0);
 
   // 2. Entradas no financeiro (vendas fechadas, manuais)
-  //    Desconta automaticamente estornos de cancelamento
+  //    tipo:'estorno' é correção de receita — NÃO é despesa
   const entradas=DB.movs.filter(m=>m.tipo==='in').reduce((a,m)=>a+parseR(m.val),0);
   const saidas=DB.movs.filter(m=>m.tipo==='out').reduce((a,m)=>a+parseR(m.val),0);
+  const estornos=DB.movs.filter(m=>m.tipo==='estorno').reduce((a,m)=>a+parseR(m.val),0);
 
   // 3. Deals fechados NÃO cancelados
   const dealsFechados=DB.deals.filter(d=>
@@ -1513,11 +1514,11 @@ function calcReceita(){
   //    Não precisa descontar manualmente pois o estorno está em saidas
 
   // Receita total = entradas - saídas (já inclui estornos) + contratos
-  const recTotal=recContratos+(entradas-saidas);
-  const saldo=entradas-saidas;
+  const recTotal=recContratos+(entradas-estornos-saidas);
+  const saldo=entradas-estornos-saidas;
 
   return {
-    recContratos, entradas, saidas, saldo,
+    recContratos, entradas, saidas, estornos, saldo,
     recDeals, dealsFechados,
     nContratos:contratosAtivos.length,
     recTotal: Math.max(0, recTotal),
@@ -1823,10 +1824,11 @@ function cancelarVenda(id){
     d.motivoCancelamento=motivo;
     d.obsCancelamento=obs;
 
-    // Estorna no financeiro se foi lançado
+    // Estorna no financeiro se foi lançado — marca como estorno (não é despesa)
     if(d.lancado && parseR(d.val)>0){
       DB.movs.unshift({
-        id:uid(),tipo:'out',
+        id:uid(),
+        tipo:'estorno',  // tipo especial — não é despesa nem receita
         val:String(parseR(d.val)),
         desc:`🚫 Estorno — ${d.emp} (${motivo})`,
         ref:`Cancelamento · ${dataHora}`
@@ -2640,32 +2642,53 @@ function rFinanceiro(){
   const r=calcReceita();
   set('fin-r', fmtR(r.recTotal));
   set('fin-c', r.nContratos);
-  set('fin-d', fmtR(r.saidas));
+  set('fin-d', fmtR(r.saidas));   // só despesas reais
   set('fin-s', fmtR(r.saldo));
   set('fin-sd', r.saldo>=0?'↑ positivo':'↓ negativo');
 
   m.innerHTML=DB.movs.length?DB.movs.map((mv,i)=>{
-    const isEstorno=mv.desc&&mv.desc.includes('Estorno');
-    return `<div class="finr" style="${isEstorno?'background:rgba(239,68,68,.04);border:1px solid rgba(239,68,68,.15);border-radius:9px;':''}" >
-      <div class="finic" style="background:${mv.tipo==='in'?'rgba(0,217,126,.12)':'rgba(255,140,66,.12)'}">${mv.tipo==='in'?'💰':'💸'}</div>
+    const isEstorno=mv.tipo==='estorno';
+    const isIn=mv.tipo==='in';
+    const isOut=mv.tipo==='out';
+    const icone=isIn?'💰':isEstorno?'🚫':'💸';
+    const bg=isIn?'rgba(0,217,126,.12)':isEstorno?'rgba(239,68,68,.08)':'rgba(255,140,66,.12)';
+    const corValor=isIn?'var(--green)':isEstorno?'var(--red)':'var(--orange)';
+    const sinal=isIn?'+':'-';
+    const label=isEstorno?'🚫 Cancelamento (estorno)':'';
+    return `<div class="finr" style="${isEstorno?'background:rgba(239,68,68,.04);border:1px solid rgba(239,68,68,.15);border-radius:9px;':''}">
+      <div class="finic" style="background:${bg}">${icone}</div>
       <div style="flex:1">
-        <div style="font-size:13px;font-weight:600;color:${isEstorno?'#ef4444':'var(--t1)'}">${mv.desc||'—'}${isEstorno?' 🚫':''}</div>
-        <div style="font-size:11px;color:var(--t2)">${mv.ref||'—'}</div>
+        <div style="font-size:13px;font-weight:600;color:${isEstorno?'var(--red)':'var(--t1)'}">${mv.desc||'—'}</div>
+        <div style="font-size:11px;color:var(--t2)">${mv.ref||'—'}${isEstorno?` <span style="font-size:9px;background:rgba(239,68,68,.12);color:var(--red);padding:1px 5px;border-radius:4px;font-weight:700">ESTORNO — nao e despesa</span>`:''}</div>
       </div>
       <div style="display:flex;align-items:center;gap:7px">
-        <span style="font-size:13px;font-weight:800;font-family:var(--M);color:${mv.tipo==='in'?'var(--green)':'var(--red)'}">${mv.tipo==='in'?'+':'-'} ${fmtR(mv.val)}</span>
+        <span style="font-size:13px;font-weight:800;font-family:var(--M);color:${corValor}">${sinal} ${fmtR(mv.val)}</span>
         <button class="btn br sm adm" onclick="delMov(${mv.id})" style="padding:2px 5px;font-size:9px">✕</button>
       </div>
     </div>`;
   }).join('')+`
-    <div style="background:var(--s2);border-radius:9px;padding:10px;margin-top:10px;display:flex;justify-content:space-between;align-items:center">
-      <div>
-        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.8px">Receita Total Líquida</div>
-        <div style="font-size:10px;color:var(--t3)">Contratos + Vendas − Estornos</div>
+    <div style="background:var(--s2);border-radius:9px;padding:10px;margin-top:10px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:11px;color:var(--t3)">Entradas</span>
+        <span style="color:var(--green);font-weight:700">${fmtR(r.entradas)}</span>
       </div>
-      <div style="font-size:20px;font-weight:900;color:${r.recTotal>=0?'var(--green)':'var(--red)'}">${fmtR(r.recTotal)}</div>
+      ${r.estornos>0?`<div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:11px;color:var(--t3)">Estornos (cancelamentos)</span>
+        <span style="color:var(--red);font-weight:700">- ${fmtR(r.estornos)}</span>
+      </div>`:''}
+      ${r.saidas>0?`<div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:11px;color:var(--t3)">Despesas</span>
+        <span style="color:var(--orange);font-weight:700">- ${fmtR(r.saidas)}</span>
+      </div>`:''}
+      <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--bd);padding-top:6px;margin-top:4px">
+        <div>
+          <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.8px">Receita Total Liquida</div>
+          <div style="font-size:10px;color:var(--t3)">Contratos + Entradas − Estornos − Despesas</div>
+        </div>
+        <div style="font-size:20px;font-weight:900;color:${r.recTotal>=0?'var(--green)':'var(--red)'}">${fmtR(r.recTotal)}</div>
+      </div>
     </div>
-  `:empty('💰','Sem lançamentos','Adicione entradas e saídas');
+  `:empty('💰','Sem lancamentos','Adicione entradas e saidas');
 }
 function delMov(id){registrarDelecao(id);DB.movs=DB.movs.filter(x=>x.id!==id);rFinanceiro();updKPI();toast('Lançamento removido!');}
 
@@ -8720,13 +8743,14 @@ ${DB.metas?.length?`
   <table>
     <thead><tr><th>Descricao</th><th>Referencia</th><th>Tipo</th><th>Valor</th></tr></thead>
     <tbody>
-      ${DB.movs.slice(0,10).map(m=>`
+      ${DB.movs.filter(m=>m.tipo!=='estorno').slice(0,10).map(m=>`
         <tr>
           <td>${m.desc||'-'}</td>
           <td>${m.ref||'-'}</td>
           <td><span class="badge ${m.tipo==='in'?'badge-ok':'badge-err'}">${m.tipo==='in'?'Entrada':'Saida'}</span></td>
           <td class="${m.tipo==='in'?'valor-verde':'valor-vermelho'}">${m.tipo==='in'?'+':'-'} ${fmtR(m.val)}</td>
         </tr>`).join('')}
+      ${DB.movs.filter(m=>m.tipo==='estorno').length?`<tr style="background:#fce4ec"><td colspan="4" style="color:#c62828;font-size:10px;font-weight:700;text-align:center">🚫 Estornos: -${fmtR(DB.movs.filter(m=>m.tipo==='estorno').reduce((a,m)=>a+parseR(m.val),0))} (descontado da receita, nao e despesa)</td></tr>`:''}
     </tbody>
   </table>`:''}
 </div>
