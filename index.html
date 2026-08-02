@@ -2460,14 +2460,18 @@ function abrirNovaTarefa(){
     const obs=($('ntsk-obs')?.value||'').trim();
     const priCores={alta:'#ff4560',media:'#f5a623',baixa:'#3d9bff'};
     const dataHora=data?(data+(hora?'T'+hora:'')):null;
-    DB.tasks.push({
+    const novaTask={
       id:uid(), txt:txt+(obs?'\n'+obs:''),
       due:data?new Date(data).toLocaleDateString('pt-BR'):'Sem data',
       dataHora, hora, pri:priCores[pri], pri2:pri,
       cliente:cli, done:false, per:'h'
-    });
+    };
+    DB.tasks.push(novaTask);
     rTasks(); M.close(); $('mod-save-btn').onclick=()=>M.save();
-    autoSave(); toast('✅ Tarefa criada!');
+    autoSave();
+    // Notifica equipe no WhatsApp
+    if(data) notificarTarefaCriada({txt,dataHora,cli,resp:CU?.nome});
+    toast('✅ Tarefa criada! WhatsApp enviado para a equipe.');
   };
   $('MOD').classList.add('open');
 }
@@ -3856,7 +3860,9 @@ const M={
       if(cli) adicionarEvento(cli,'agenda',`${icMap[tipo]} ${tipo}: ${titulo}${tec?' — Técnico: '+tec:''}`,icMap[tipo]);
       addFeed('📅','rgba(61,155,255,.12)',`Agenda: ${titulo}${cli?' → '+cli:''}`);
       rAgenda(); autoSave();
-      toast(`✅ "${titulo}" adicionado à agenda!`);
+      // Notifica equipe no WhatsApp
+      notificarAgendaCriada({t:titulo,h:horaFmt,data:dataFmt,cli,tec,obs});
+      toast(`✅ "${titulo}" adicionado à agenda! WhatsApp enviado para a equipe.`);
 
     }else if(_mtype==='usuario'){
       const nome=gv('f0');if(!nome){toast('⚠️ Informe o nome!');return;}
@@ -8190,6 +8196,34 @@ function mostrarResumoDia(itens){
   $('MOD').classList.add('open');
 }
 
+// ── Números fixos da equipe ──────────────────────
+const EQUIPE_NUMEROS = [
+  {nome:'Hino',   tel:'5581997914939'},
+  {nome:'Nivaldo',tel:'5581997111402'},
+];
+
+// Envia WhatsApp para toda a equipe
+function notificarEquipeWhatsApp(msg){
+  EQUIPE_NUMEROS.forEach((m,i)=>{
+    setTimeout(()=>{
+      window.open(`https://wa.me/${m.tel}?text=${encodeURIComponent(msg)}`,'_blank');
+    }, i*1500); // abre um de cada vez com 1.5s de intervalo
+  });
+}
+
+// Notifica equipe ao criar tarefa
+function notificarTarefaCriada(tarefa){
+  const venc=tarefa.dataHora?new Date(tarefa.dataHora).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'Sem prazo';
+  const msg=`📋 *Nova Tarefa — Grupo Aliança*\n\n✅ ${tarefa.txt}\n📅 Prazo: ${venc}\n${tarefa.cli?'👤 Cliente: '+tarefa.cli:''}\n${tarefa.resp?'👷 Responsável: '+tarefa.resp:''}\n\n— Sistema CRM 🛡️`;
+  notificarEquipeWhatsApp(msg);
+}
+
+// Notifica equipe ao criar evento na agenda
+function notificarAgendaCriada(ev){
+  const msg=`📅 *Novo Evento na Agenda — Grupo Aliança*\n\n${ev.t||ev.titulo}\n🕐 ${ev.h||''} ${ev.data?'· '+ev.data:''}\n${ev.cli?'👤 '+ev.cli:''}\n${ev.tec?'👷 Técnico: '+ev.tec:''}\n${ev.obs?'📝 '+ev.obs:''}\n\n— Sistema CRM 🛡️`;
+  notificarEquipeWhatsApp(msg);
+}
+
 function montarTextoResumo(){
   const itens=coletarVencimentosDia();
   const hoje=new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
@@ -8213,15 +8247,9 @@ function montarTextoResumo(){
 }
 
 function enviarResumoWhatsApp(){
-  const meuTel=(CU?.tel||DB.cfgN?.tel||'').replace(/\D/g,'');
   const msg=montarTextoResumo();
-  if(meuTel){
-    window.open(`https://wa.me/55${meuTel}?text=${encodeURIComponent(msg)}`,'_blank');
-  } else {
-    // Sem número configurado — abre WhatsApp sem destino
-    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`,'_blank');
-    toast('💡 Configure seu número em ⚙️ Configurações para envio direto!');
-  }
+  notificarEquipeWhatsApp(msg);
+  toast('💬 Abrindo WhatsApp para Hino e Nivaldo...');
 }
 
 async function enviarResumoEmail(){
