@@ -384,6 +384,7 @@ tr:hover td{background:rgba(255,255,255,.017);}
     <div class="sur">
       <div class="sav" id="sav">GA</div>
       <div style="flex:1;min-width:0"><div class="sn" id="snm">—</div><div class="sr" id="srl">—</div><div class="sbadge" id="sbadge">ADMIN</div></div>
+      <span class="lout" onclick="verResumoDia()" title="Resumo do Dia" style="font-size:13px;margin-right:4px">📋</span>
       <span class="lout adm" onclick="forceLogoutAll()" title="Deslogar todos os dispositivos" style="font-size:12px;margin-right:4px">🔒</span>
       <span class="lout" onclick="logout()" title="Sair">⏻</span>
     </div>
@@ -8068,6 +8069,189 @@ function salvarCliente(){
 }
 
 
+// ═══════════════════════════════════════════════════
+//  🔔 SISTEMA DE NOTIFICAÇÕES DIÁRIAS
+// ═══════════════════════════════════════════════════
+
+function verificarVencimentosDia(){
+  // Evita mostrar duas vezes no mesmo dia
+  const hoje=new Date().toLocaleDateString('pt-BR');
+  const jaViu=localStorage.getItem('alianca_notif_dia');
+  if(jaViu===hoje) return;
+
+  const itens=coletarVencimentosDia();
+  if(!itens.length) return;
+
+  // Salva que já mostrou hoje
+  localStorage.setItem('alianca_notif_dia', hoje);
+
+  // Adiciona notificações no CRM
+  itens.forEach(it=>{
+    DB.notifs.unshift({
+      ic:it.ic, t:it.titulo, sub:it.sub,
+      time:nowStr(), tipo:it.urgente?'danger':'unread'
+    });
+  });
+  rNotifs(); updKPI();
+
+  // Mostra modal de resumo do dia
+  setTimeout(()=>mostrarResumoDia(itens), 1000);
+}
+
+function coletarVencimentosDia(){
+  const hoje=new Date(); hoje.setHours(0,0,0,0);
+  const amanha=new Date(hoje); amanha.setDate(amanha.getDate()+1);
+  const itens=[];
+
+  // Tarefas vencendo hoje
+  DB.tasks.filter(t=>!t.done&&t.dataHora).forEach(t=>{
+    const d=new Date(t.dataHora); d.setHours(0,0,0,0);
+    const diff=Math.floor((d-hoje)/(1000*60*60*24));
+    if(diff===0) itens.push({ic:'✅',titulo:'Tarefa para hoje',sub:t.txt,tipo:'tarefa',urgente:false,obj:t});
+    if(diff<0) itens.push({ic:'🚨',titulo:'Tarefa atrasada',sub:`${t.txt} (${Math.abs(diff)}d atraso)`,tipo:'tarefa',urgente:true,obj:t});
+  });
+
+  // Cobranças vencendo hoje ou atrasadas
+  (DB.cobrancas||[]).filter(c=>!c.pago&&c.vencimento).forEach(c=>{
+    const d=new Date(c.vencimento); d.setHours(0,0,0,0);
+    const diff=Math.floor((d-hoje)/(1000*60*60*24));
+    if(diff===0) itens.push({ic:'💸',titulo:`Cobrança vence hoje — ${c.cliente}`,sub:`${fmtR(c.valor)} · ${c.descricao}`,tipo:'cobranca',urgente:true,obj:c});
+    if(diff<0) itens.push({ic:'🚨',titulo:`Cobrança atrasada — ${c.cliente}`,sub:`${fmtR(c.valor)} · ${Math.abs(diff)} dia(s) em atraso`,tipo:'cobranca',urgente:true,obj:c});
+    if(diff===1) itens.push({ic:'⏰',titulo:`Cobrança vence amanhã — ${c.cliente}`,sub:`${fmtR(c.valor)} · ${c.descricao}`,tipo:'cobranca',urgente:false,obj:c});
+  });
+
+  // Agenda de hoje
+  const hojeStr=hoje.toLocaleDateString('pt-BR');
+  (DB.agenda?.h||[]).forEach(ev=>{
+    if(!ev.data||ev.data===hojeStr)
+      itens.push({ic:'📅',titulo:`Agenda: ${ev.t||ev.titulo}`,sub:`${ev.h||''}${ev.cli?' · '+ev.cli:''}${ev.tec?' · Téc: '+ev.tec:''}`,tipo:'agenda',urgente:false,obj:ev});
+  });
+  (DB.agenda?.s||[]).forEach(ev=>{
+    if(ev.data===hojeStr)
+      itens.push({ic:'📅',titulo:`Agenda: ${ev.t||ev.titulo}`,sub:`${ev.h||''}${ev.cli?' · '+ev.cli:''}${ev.tec?' · Téc: '+ev.tec:''}`,tipo:'agenda',urgente:false,obj:ev});
+  });
+
+  // OS abertas há mais de 3 dias
+  DB.os.filter(o=>o.s!=='at').forEach(o=>{
+    if(o.dataRaw){
+      const d=new Date(o.dataRaw);
+      const diff=Math.floor((hoje-d)/(1000*60*60*24));
+      if(diff>=3) itens.push({ic:'🔧',titulo:`OS atrasada — ${o.cli}`,sub:`${o.tipo||o.oid} · ${diff} dias em aberto`,tipo:'os',urgente:diff>=5,obj:o});
+    }
+  });
+
+  return itens;
+}
+
+function mostrarResumoDia(itens){
+  const hoje=new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+  const urgentes=itens.filter(i=>i.urgente);
+  const normais=itens.filter(i=>!i.urgente);
+
+  const tel=DB.empresas[0]?.tel||CU?.tel||'';
+
+  $('mod-title').innerHTML='🔔 Resumo do Dia — '+hoje;
+  $('mod-body').innerHTML=`
+    ${urgentes.length?`
+    <div style="background:rgba(255,69,96,.08);border:1px solid rgba(255,69,96,.2);border-radius:10px;padding:12px;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:8px">🚨 Urgente (${urgentes.length})</div>
+      ${urgentes.map(it=>`
+        <div style="display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px solid rgba(255,69,96,.1)">
+          <span style="font-size:15px">${it.ic}</span>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--red)">${it.titulo}</div>
+            <div style="font-size:11px;color:var(--t2)">${it.sub}</div>
+          </div>
+        </div>`).join('')}
+    </div>`:''}
+    ${normais.length?`
+    <div style="background:var(--s2);border-radius:10px;padding:12px;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;color:var(--gold);margin-bottom:8px">📋 Hoje (${normais.length})</div>
+      ${normais.map(it=>`
+        <div style="display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px solid var(--bd)">
+          <span style="font-size:15px">${it.ic}</span>
+          <div>
+            <div style="font-size:12px;font-weight:700">${it.titulo}</div>
+            <div style="font-size:11px;color:var(--t2)">${it.sub}</div>
+          </div>
+        </div>`).join('')}
+    </div>`:''}
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button onclick="enviarResumoWhatsApp()" style="flex:1;padding:10px;background:rgba(0,196,140,.12);border:1px solid rgba(0,196,140,.3);border-radius:9px;color:var(--green);font-size:12px;font-weight:700;cursor:pointer">
+        💬 Enviar resumo no WhatsApp
+      </button>
+      <button onclick="enviarResumoEmail()" style="flex:1;padding:10px;background:rgba(61,155,255,.1);border:1px solid rgba(61,155,255,.3);border-radius:9px;color:#3d9bff;font-size:12px;font-weight:700;cursor:pointer">
+        📧 Enviar por E-mail
+      </button>
+    </div>`;
+
+  const btn=$('mod-save-btn');
+  if(btn){btn.textContent='Fechar';btn.onclick=()=>{btn.textContent='Salvar';btn.onclick=()=>M.save();M.close();};}
+  $('MOD').classList.add('open');
+}
+
+function montarTextoResumo(){
+  const itens=coletarVencimentosDia();
+  const hoje=new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+  if(!itens.length) return `Bom dia! ☀️\n\nNenhum compromisso pendente para hoje.\n\n— Grupo Aliança Monitoramento`;
+
+  let msg=`☀️ *Resumo do Dia — ${hoje}*\n\n`;
+  const urgentes=itens.filter(i=>i.urgente);
+  const normais=itens.filter(i=>!i.urgente);
+
+  if(urgentes.length){
+    msg+=`🚨 *URGENTE*\n`;
+    urgentes.forEach(it=>{ msg+=`${it.ic} ${it.titulo}\n   ${it.sub}\n`; });
+    msg+='\n';
+  }
+  if(normais.length){
+    msg+=`📋 *HOJE*\n`;
+    normais.forEach(it=>{ msg+=`${it.ic} ${it.titulo}\n   ${it.sub}\n`; });
+  }
+  msg+=`\n— Grupo Aliança Monitoramento 🛡️`;
+  return msg;
+}
+
+function enviarResumoWhatsApp(){
+  const meuTel=(CU?.tel||DB.cfgN?.tel||'').replace(/\D/g,'');
+  const msg=montarTextoResumo();
+  if(meuTel){
+    window.open(`https://wa.me/55${meuTel}?text=${encodeURIComponent(msg)}`,'_blank');
+  } else {
+    // Sem número configurado — abre WhatsApp sem destino
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`,'_blank');
+    toast('💡 Configure seu número em ⚙️ Configurações para envio direto!');
+  }
+}
+
+async function enviarResumoEmail(){
+  const emailCfg=localStorage.getItem('alianca_emailjs');
+  if(!emailCfg){
+    toast('⚠️ Configure o EmailJS em ⚙️ Configurações → E-mail Marketing');
+    M.close(); go('email'); return;
+  }
+  const {serviceId,templateId,userId}=JSON.parse(emailCfg);
+  const msg=montarTextoResumo();
+  try{
+    await emailjs.send(serviceId, templateId, {
+      to_name: CU?.nome||'Equipe',
+      message: msg,
+      subject: `📋 Resumo do Dia — ${new Date().toLocaleDateString('pt-BR')}`
+    }, userId);
+    toast('✅ Resumo enviado por e-mail!');
+  }catch(e){
+    toast('❌ Erro no e-mail: '+e.message);
+  }
+}
+
+// Botão manual para ver resumo do dia
+function verResumoDia(){
+  const itens=coletarVencimentosDia();
+  if(!itens.length){toast('✅ Nenhum item pendente para hoje!');return;}
+  mostrarResumoDia(itens);
+}
+
+
 function popularHistoricoSel(){
   const sel=$('hist-cliente-sel'); if(!sel) return;
   sel.innerHTML='<option value="">— Selecione um cliente —</option>'
@@ -8121,6 +8305,11 @@ function initApp(){
 
   // Inicia sincronização JSONBin
   setTimeout(()=>{ iniciarSyncJB(); atualizarStatusJB(); }, 1500);
+
+  // Verificação diária de vencimentos
+  setTimeout(()=>verificarVencimentosDia(), 3000);
+  // Verifica a cada hora
+  setInterval(()=>verificarVencimentosDia(), 60*60*1000);
 
   // Restaura backup automático se estava ativo
   const backupIntervalo = localStorage.getItem('alianca_backup_intervalo');
