@@ -8331,321 +8331,420 @@ function verResumoDia(){
 // ═══════════════════════════════════════════════════
 
 function gerarRelatorioDiario(){
-  try{
-    const {jsPDF}=window.jspdf;
-    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
-    const PW=210, M=14;
-    const hoje=new Date();
-    const hojeStr=hoje.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
-    const hojeSimples=hoje.toLocaleDateString('pt-BR');
-    let y=0;
+  const hoje=new Date();
+  const hojeStr=hoje.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  const hojeSimples=hoje.toLocaleDateString('pt-BR');
+  const horaStr=hoje.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  const r=calcReceita();
 
-    // ── Funções auxiliares ──────────────────────
-    function setFont(size,style='normal',r=220,g=235,b=255){
-      doc.setFontSize(size); doc.setFont('helvetica',style);
-      doc.setTextColor(r,g,b);
-    }
-    function secHeader(titulo,icone=''){
-      y+=4;
-      doc.setFillColor(21,101,192); doc.rect(M,y,PW-2*M,7,'F');
-      doc.setTextColor(255,255,255); doc.setFontSize(9); doc.setFont('helvetica','bold');
-      doc.text(`${icone} ${titulo}`,M+3,y+5);
-      y+=11;
-    }
-    function rowPar(label,valor,cinza=false){
-      if(cinza){doc.setFillColor(240,246,255); doc.rect(M,y-4,PW-2*M,7,'F');}
-      doc.setTextColor(90,130,180); doc.setFontSize(8.5); doc.setFont('helvetica','normal');
-      doc.text(label,M+3,y);
-      doc.setTextColor(30,50,80); doc.setFont('helvetica','bold');
-      doc.text(String(valor),PW-M-3,y,{align:'right'});
-      y+=6.5;
-    }
-    function linha(){
-      doc.setDrawColor(200,220,245); doc.setLineWidth(0.2);
-      doc.line(M,y-2,PW-M,y-2); y+=1;
-    }
-    function checkPagina(space=20){
-      if(y+space>275){
-        doc.addPage();
-        desenharCabecalhoMini();
-        y=30;
-      }
-    }
+  // Dados para graficos
+  const stagesData=DB.stages.map((sg,si)=>({
+    nome:sg.n.replace('🏆 ',''), cor:sg.c,
+    qtd:DB.deals.filter(d=>d.stage===si&&!d.cancelado).length,
+    val:DB.deals.filter(d=>d.stage===si&&!d.cancelado).reduce((a,d)=>a+parseR(d.val),0)
+  }));
+  const maxVal=Math.max(...stagesData.map(s=>s.val),1);
+  const totalDeals=DB.deals.filter(d=>!d.cancelado).length;
+  const dealsFechados=DB.deals.filter(d=>d.stage===DB.stages.length-1&&!d.cancelado);
+  const contrAtivos=DB.contratos.filter(c=>c.s==='at');
+  const totalContr=contrAtivos.reduce((a,c)=>a+parseR(c.val),0);
+  const cobsAtrasadas=(DB.cobrancas||[]).filter(c=>!c.pago&&c.vencimento&&new Date(c.vencimento)<hoje);
+  const cobsPagas=(DB.cobrancas||[]).filter(c=>c.pago);
+  const totalCobPago=cobsPagas.reduce((a,c)=>a+parseFloat(c.valor||0),0);
+  const totalCobPend=(DB.cobrancas||[]).filter(c=>!c.pago).reduce((a,c)=>a+parseFloat(c.valor||0),0);
+  const osConc=DB.os.filter(o=>o.s==='at').length;
+  const osAb=DB.os.filter(o=>o.s!=='at').length;
 
-    function desenharCabecalhoMini(){
-      doc.setFillColor(21,101,192); doc.rect(0,0,PW,12,'F');
-      doc.setTextColor(255,255,255); doc.setFontSize(8); doc.setFont('helvetica','bold');
-      doc.text('Grupo Aliança Monitoramento — Relatório Diário',M,8);
-      doc.text(hojeSimples,PW-M,8,{align:'right'});
-    }
+  const html=`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Relatorio Diario - ${hojeSimples}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI',Arial,sans-serif;font-size:11px;color:#1a2a4a;background:#fff}
+  @media print{
+    body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .no-print{display:none}
+    .quebra{page-break-before:always}
+  }
+  /* CAPA */
+  .capa{background:linear-gradient(135deg,#0d2050 0%,#1565C0 60%,#1976D2 100%);color:#fff;padding:32px 40px;min-height:160px;display:flex;align-items:center;gap:24px}
+  .capa-logo{width:64px;height:64px;background:#f5a623;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:30px;flex-shrink:0}
+  .capa h1{font-size:22px;font-weight:700;margin-bottom:4px}
+  .capa h2{font-size:14px;font-weight:400;opacity:.85;margin-bottom:12px}
+  .capa-date{background:rgba(255,255,255,.15);border-radius:8px;padding:6px 14px;display:inline-block;font-size:13px;font-weight:600}
+  /* SUMARIO */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:20px 40px;background:#f0f6ff}
+  .kpi{background:#fff;border-radius:10px;padding:14px;border:1px solid #c8ddf8;border-top:3px solid #1565C0}
+  .kpi-val{font-size:22px;font-weight:700;color:#1565C0;margin:4px 0}
+  .kpi-label{font-size:10px;color:#5c8ab8;text-transform:uppercase;letter-spacing:.6px}
+  .kpi-sub{font-size:10px;color:#7a96bb;margin-top:2px}
+  /* SECOES */
+  .secao{padding:20px 40px;border-bottom:2px solid #e8f0fe}
+  .secao:last-child{border-bottom:none}
+  .sec-titulo{display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #1565C0}
+  .sec-titulo h3{font-size:13px;font-weight:700;color:#1565C0;text-transform:uppercase;letter-spacing:.8px}
+  .sec-titulo .ic{font-size:18px}
+  /* TABELAS */
+  table{width:100%;border-collapse:collapse;font-size:10.5px}
+  th{background:#1565C0;color:#fff;padding:7px 10px;text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+  td{padding:7px 10px;border-bottom:1px solid #e8f0fe;color:#1a2a4a}
+  tr:nth-child(even) td{background:#f8fbff}
+  tr:hover td{background:#e8f4ff}
+  .badge{padding:2px 8px;border-radius:12px;font-size:9px;font-weight:700}
+  .badge-ok{background:#e8f5e9;color:#2e7d32}
+  .badge-warn{background:#fff8e1;color:#f57f17}
+  .badge-err{background:#fce4ec;color:#c62828}
+  .badge-info{background:#e3f2fd;color:#1565C0}
+  .valor{font-weight:700;color:#1565C0;font-family:monospace}
+  .valor-verde{font-weight:700;color:#2e7d32;font-family:monospace}
+  .valor-vermelho{font-weight:700;color:#c62828;font-family:monospace}
+  /* GRAFICOS CSS */
+  .grafico-barras{display:flex;align-items:flex-end;gap:8px;height:120px;padding:10px 0;border-bottom:2px solid #1565C0}
+  .barra-wrap{display:flex;flex-direction:column;align-items:center;flex:1;gap:4px}
+  .barra{width:100%;background:#e3f2fd;border-radius:4px 4px 0 0;position:relative;display:flex;align-items:flex-end;justify-content:center;min-height:4px;transition:all .3s}
+  .barra-fill{width:100%;background:linear-gradient(to top,#1565C0,#42a5f5);border-radius:4px 4px 0 0}
+  .barra-val{font-size:8px;font-weight:700;color:#1565C0;margin-top:3px;text-align:center}
+  .barra-label{font-size:8px;color:#5c8ab8;text-align:center;line-height:1.2}
+  /* PIZZA */
+  .pizza-wrap{display:flex;gap:24px;align-items:center}
+  .pizza-legenda{display:flex;flex-direction:column;gap:6px}
+  .leg-item{display:flex;align-items:center;gap:6px;font-size:10px}
+  .leg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+  /* PROGRESSO */
+  .progress-bar{height:8px;background:#e3f2fd;border-radius:20px;overflow:hidden;margin:4px 0}
+  .progress-fill{height:100%;border-radius:20px;background:linear-gradient(to right,#1565C0,#42a5f5)}
+  /* GRID 2 col */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  /* RODAPE */
+  .rodape{background:#1565C0;color:#fff;padding:12px 40px;display:flex;justify-content:space-between;align-items:center;font-size:10px}
+  .btn-imprimir{position:fixed;top:16px;right:16px;background:#1565C0;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;z-index:999;box-shadow:0 4px 12px rgba(21,101,192,.4)}
+  .btn-imprimir:hover{background:#0d47a1}
+  .sem-dados{color:#b0c4de;font-style:italic;padding:8px 0}
+</style>
+</head>
+<body>
 
-    // ── CAPA ────────────────────────────────────
-    // Fundo azul topo
-    doc.setFillColor(13,32,74); doc.rect(0,0,PW,55,'F');
-    doc.setFillColor(21,101,192); doc.rect(0,45,PW,18,'F');
+<button class="btn-imprimir no-print" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
 
-    // Logo área
-    doc.setFillColor(245,166,35); doc.roundedRect(M,10,18,18,3,3,'F');
-    doc.setTextColor(0,0,0); doc.setFontSize(14); doc.setFont('helvetica','bold');
-    doc.text('GA',M+4.5,22);
+<!-- CAPA -->
+<div class="capa">
+  <div class="capa-logo">⚡</div>
+  <div>
+    <h1>Grupo Alianca Monitoramento</h1>
+    <h2>Seguranca Eletronica Profissional</h2>
+    <div class="capa-date">📊 Relatorio Diario de Atividades &nbsp;|&nbsp; ${hojeStr} &nbsp;|&nbsp; Gerado as ${horaStr}</div>
+  </div>
+</div>
 
-    // Nome empresa
-    doc.setTextColor(255,255,255); doc.setFontSize(16); doc.setFont('helvetica','bold');
-    doc.text('Grupo Aliança Monitoramento',M+22,20);
-    doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(180,210,255);
-    doc.text('Segurança Eletrônica Profissional',M+22,27);
+<!-- KPIs -->
+<div class="kpis">
+  <div class="kpi">
+    <div class="kpi-label">💰 Receita Total</div>
+    <div class="kpi-val">${fmtR(r.recTotal)}</div>
+    <div class="kpi-sub">${contrAtivos.length} contratos ativos</div>
+  </div>
+  <div class="kpi" style="border-top-color:#2e7d32">
+    <div class="kpi-label">🏆 Vendas Fechadas</div>
+    <div class="kpi-val" style="color:#2e7d32">${dealsFechados.length}</div>
+    <div class="kpi-sub">${fmtR(dealsFechados.reduce((a,d)=>a+parseR(d.val),0))} em valor</div>
+  </div>
+  <div class="kpi" style="border-top-color:#f57f17">
+    <div class="kpi-label">👥 Clientes</div>
+    <div class="kpi-val" style="color:#f57f17">${DB.empresas.length}</div>
+    <div class="kpi-sub">${DB.contratos.filter(c=>c.s==='at').length} com contrato ativo</div>
+  </div>
+  <div class="kpi" style="border-top-color:#7b1fa2">
+    <div class="kpi-label">🔧 Atendimentos</div>
+    <div class="kpi-val" style="color:#7b1fa2">${DB.os.length}</div>
+    <div class="kpi-sub">${osConc} concluidos · ${osAb} em aberto</div>
+  </div>
+</div>
 
-    // Título relatório
-    doc.setTextColor(255,255,255); doc.setFontSize(13); doc.setFont('helvetica','bold');
-    doc.text('RELATÓRIO DIÁRIO DE ATIVIDADES',M,54);
+<!-- GRAFICO PIPELINE -->
+<div class="secao">
+  <div class="sec-titulo"><span class="ic">🏆</span><h3>Pipeline de Vendas</h3><span style="margin-left:auto;font-size:11px;color:#5c8ab8">${totalDeals} negocio(s) no total</span></div>
+  <div class="grid2">
+    <div>
+      <div class="grafico-barras">
+        ${stagesData.map(s=>`
+          <div class="barra-wrap">
+            <div style="font-size:9px;font-weight:700;color:#1565C0;text-align:center">${s.qtd>0?fmtR(s.val):''}</div>
+            <div class="barra" style="height:100%">
+              <div class="barra-fill" style="height:${s.val?Math.max(8,Math.round(s.val/maxVal*100))+'%':'4px'};background:${s.cor}"></div>
+            </div>
+            <div class="barra-val">${s.qtd}</div>
+            <div class="barra-label">${s.nome}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div>
+      <table>
+        <thead><tr><th>Etapa</th><th>Qtd</th><th>Valor</th></tr></thead>
+        <tbody>
+          ${stagesData.map(s=>`
+            <tr>
+              <td><span style="display:inline-block;width:8px;height:8px;background:${s.cor};border-radius:50%;margin-right:4px"></span>${s.nome}</td>
+              <td>${s.qtd}</td>
+              <td class="valor">${fmtR(s.val)}</td>
+            </tr>`).join('')}
+          <tr style="background:#f0f6ff;font-weight:700">
+            <td><strong>TOTAL</strong></td>
+            <td><strong>${totalDeals}</strong></td>
+            <td class="valor-verde">${fmtR(stagesData.reduce((a,s)=>a+s.val,0))}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  ${DB.deals.filter(d=>d.stage===DB.stages.length-1&&!d.cancelado).length?`
+  <div style="margin-top:14px">
+    <div style="font-size:11px;font-weight:700;color:#2e7d32;margin-bottom:6px">✅ Vendas Fechadas</div>
+    <table>
+      <thead><tr><th>Cliente</th><th>Servico</th><th>Valor</th><th>Responsavel</th></tr></thead>
+      <tbody>
+        ${DB.deals.filter(d=>d.stage===DB.stages.length-1&&!d.cancelado).map(d=>`
+          <tr>
+            <td><strong>${d.emp}</strong></td>
+            <td>${TAGL[d.tag]||d.tag||'-'}</td>
+            <td class="valor-verde">${fmtR(d.val)}</td>
+            <td>${d.ini||'-'}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`:''}
+</div>
 
-    // Data e hora
-    doc.setFillColor(240,246,255); doc.rect(0,63,PW,14,'F');
-    doc.setTextColor(21,101,192); doc.setFontSize(11); doc.setFont('helvetica','bold');
-    doc.text(hojeStr.charAt(0).toUpperCase()+hojeStr.slice(1),PW/2,72,{align:'center'});
-    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(90,130,180);
-    doc.text(`Gerado em: ${hoje.toLocaleString('pt-BR')}`,PW/2,78,{align:'center'});
-    y=88;
+<!-- CLIENTES E CONTRATOS -->
+<div class="secao">
+  <div class="grid2">
+    <div>
+      <div class="sec-titulo"><span class="ic">👥</span><h3>Clientes (${DB.empresas.length})</h3></div>
+      ${DB.empresas.length?`
+      <table>
+        <thead><tr><th>Cliente</th><th>Telefone</th><th>Status</th></tr></thead>
+        <tbody>
+          ${DB.empresas.slice(0,12).map(e=>`
+            <tr>
+              <td><strong>${e.nome}</strong></td>
+              <td>${e.tel||'-'}</td>
+              <td><span class="badge ${e.s==='at'?'badge-ok':'badge-warn'}">${e.s==='at'?'Ativo':'Prospect'}</span></td>
+            </tr>`).join('')}
+          ${DB.empresas.length>12?`<tr><td colspan="3" style="text-align:center;color:#7a96bb">... e mais ${DB.empresas.length-12} clientes</td></tr>`:''}
+        </tbody>
+      </table>`:`<p class="sem-dados">Nenhum cliente cadastrado.</p>`}
+    </div>
+    <div>
+      <div class="sec-titulo"><span class="ic">📄</span><h3>Contratos Ativos (${contrAtivos.length})</h3></div>
+      ${contrAtivos.length?`
+      <table>
+        <thead><tr><th>Cliente</th><th>Servico</th><th>Valor/mes</th></tr></thead>
+        <tbody>
+          ${contrAtivos.map(c=>`
+            <tr>
+              <td>${c.cli}</td>
+              <td>${c.srv||'-'}</td>
+              <td class="valor">${fmtR(c.val)}</td>
+            </tr>`).join('')}
+          <tr style="background:#e8f5e9;font-weight:700">
+            <td colspan="2"><strong>Total mensal</strong></td>
+            <td class="valor-verde">${fmtR(totalContr)}</td>
+          </tr>
+        </tbody>
+      </table>`:`<p class="sem-dados">Nenhum contrato ativo.</p>`}
+    </div>
+  </div>
+</div>
 
-    // ── 1. RESUMO EXECUTIVO ─────────────────────
-    secHeader('RESUMO EXECUTIVO','📊');
+<!-- OS E COBRANCAS -->
+<div class="secao quebra">
+  <div class="grid2">
+    <div>
+      <div class="sec-titulo"><span class="ic">🔧</span><h3>Atendimentos / OS</h3></div>
+      <div style="display:flex;gap:10px;margin-bottom:12px">
+        <div style="flex:1;background:#e8f5e9;border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:18px;font-weight:700;color:#2e7d32">${osConc}</div>
+          <div style="font-size:9px;color:#5c8ab8">CONCLUIDAS</div>
+        </div>
+        <div style="flex:1;background:#fff8e1;border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:18px;font-weight:700;color:#f57f17">${osAb}</div>
+          <div style="font-size:9px;color:#5c8ab8">EM ABERTO</div>
+        </div>
+      </div>
+      ${DB.os.length?`
+      <table>
+        <thead><tr><th>OS</th><th>Cliente</th><th>Tecnico</th><th>Status</th></tr></thead>
+        <tbody>
+          ${DB.os.slice(0,10).map(o=>`
+            <tr>
+              <td>${o.oid}</td>
+              <td>${o.cli}</td>
+              <td>${o.tec||'-'}</td>
+              <td><span class="badge ${o.s==='at'?'badge-ok':'badge-warn'}">${o.s==='at'?'Concluida':'Em aberto'}</span></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`:`<p class="sem-dados">Nenhuma OS registrada.</p>`}
+    </div>
+    <div>
+      <div class="sec-titulo"><span class="ic">💸</span><h3>Cobrancas</h3></div>
+      <div style="display:flex;gap:10px;margin-bottom:12px">
+        <div style="flex:1;background:#e8f5e9;border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:14px;font-weight:700;color:#2e7d32">${fmtR(totalCobPago)}</div>
+          <div style="font-size:9px;color:#5c8ab8">RECEBIDO</div>
+        </div>
+        <div style="flex:1;background:#fce4ec;border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:14px;font-weight:700;color:#c62828">${fmtR(totalCobPend)}</div>
+          <div style="font-size:9px;color:#5c8ab8">PENDENTE</div>
+        </div>
+      </div>
+      ${(DB.cobrancas||[]).length?`
+      <table>
+        <thead><tr><th>Cliente</th><th>Valor</th><th>Venc.</th><th>Status</th></tr></thead>
+        <tbody>
+          ${(DB.cobrancas||[]).slice(0,10).map(c=>`
+            <tr>
+              <td>${c.cliente}</td>
+              <td class="valor">${fmtR(c.valor)}</td>
+              <td>${c.vencimento?new Date(c.vencimento+'T12:00').toLocaleDateString('pt-BR'):'-'}</td>
+              <td><span class="badge ${c.pago?'badge-ok':cobsAtrasadas.includes(c)?'badge-err':'badge-warn'}">${c.pago?'Pago':cobsAtrasadas.includes(c)?'Atrasado':'Pendente'}</span></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`:`<p class="sem-dados">Nenhuma cobranca registrada.</p>`}
+    </div>
+  </div>
+</div>
 
-    const r=calcReceita();
-    const dealsHoje=DB.deals.filter(d=>d.stage===DB.stages.length-1&&!d.cancelado);
-    const clientesHoje=DB.empresas.length;
-    const osHoje=DB.os.filter(o=>o.s==='at').length;
-    const contratosAtivos=DB.contratos.filter(c=>c.s==='at').length;
-    const cobrancasPendentes=(DB.cobrancas||[]).filter(c=>!c.pago).length;
-    const tarefasPend=DB.tasks.filter(t=>!t.done).length;
+<!-- AGENDA E TAREFAS -->
+<div class="secao">
+  <div class="grid2">
+    <div>
+      <div class="sec-titulo"><span class="ic">📅</span><h3>Agenda do Dia</h3></div>
+      ${[...(DB.agenda?.h||[]),...(DB.agenda?.s||[]).filter(e=>e.data===hojeSimples)].length?`
+      <table>
+        <thead><tr><th>Hora</th><th>Evento</th><th>Cliente / Tecnico</th></tr></thead>
+        <tbody>
+          ${[...(DB.agenda?.h||[]),...(DB.agenda?.s||[]).filter(e=>e.data===hojeSimples)].map(ev=>`
+            <tr>
+              <td>${ev.h||'-'}</td>
+              <td>${ev.t||ev.titulo||'-'}</td>
+              <td>${ev.cli||''}${ev.tec?' / '+ev.tec:''}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`:`<p class="sem-dados">Nenhum evento hoje.</p>`}
+    </div>
+    <div>
+      <div class="sec-titulo"><span class="ic">✅</span><h3>Tarefas</h3></div>
+      ${DB.tasks.length?`
+      <table>
+        <thead><tr><th>Tarefa</th><th>Prazo</th><th>Status</th></tr></thead>
+        <tbody>
+          ${DB.tasks.slice(0,10).map(t=>`
+            <tr>
+              <td>${(t.txt||'').split('\n')[0].substring(0,40)}</td>
+              <td>${t.due||'-'}</td>
+              <td><span class="badge ${t.done?'badge-ok':'badge-warn'}">${t.done?'Concluida':'Pendente'}</span></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`:`<p class="sem-dados">Nenhuma tarefa.</p>`}
+    </div>
+  </div>
+</div>
 
-    rowPar('💰 Receita Total',fmtR(r.recTotal),false);
-    rowPar('📄 Contratos Ativos',contratosAtivos,true);
-    rowPar('🏆 Vendas Fechadas',dealsHoje.length,false);
-    rowPar('👥 Total de Clientes',clientesHoje,true);
-    rowPar('🔧 OS Concluídas',osHoje,false);
-    rowPar('💸 Cobranças Pendentes',cobrancasPendentes,true);
-    rowPar('✅ Tarefas Pendentes',tarefasPend,false);
-    y+=3;
-
-    // ── 2. VENDAS E PIPELINE ────────────────────
-    checkPagina(40);
-    secHeader('PIPELINE DE VENDAS','🏆');
-    if(DB.deals.length){
-      DB.stages.forEach((sg,si)=>{
-        const deals=DB.deals.filter(d=>d.stage===si&&!d.cancelado);
-        if(!deals.length) return;
-        const tot=deals.reduce((a,d)=>a+parseR(d.val),0);
-        doc.setTextColor(21,101,192); doc.setFontSize(8.5); doc.setFont('helvetica','bold');
-        doc.text(`${sg.n} (${deals.length} negócio${deals.length>1?'s':''} · ${fmtR(tot)})`,M+3,y);
-        y+=5.5;
-        deals.forEach((d,i)=>{
-          checkPagina(8);
-          if(i%2===0){doc.setFillColor(248,251,255); doc.rect(M,y-3.5,PW-2*M,6,'F');}
-          doc.setTextColor(40,60,90); doc.setFontSize(8); doc.setFont('helvetica','normal');
-          doc.text(`   ${d.emp}`,M+3,y);
-          doc.setFont('helvetica','bold'); doc.setTextColor(21,101,192);
-          doc.text(fmtR(d.val),PW-M-3,y,{align:'right'});
-          y+=6;
-        });
-        y+=2;
-      });
-    } else {
-      doc.setTextColor(150,170,200); doc.setFontSize(8);
-      doc.text('Nenhuma venda registrada.',M+3,y); y+=8;
-    }
-
-    // ── 3. CLIENTES ─────────────────────────────
-    checkPagina(35);
-    secHeader('CLIENTES CADASTRADOS','👥');
-    if(DB.empresas.length){
-      DB.empresas.slice(0,20).forEach((e,i)=>{
-        checkPagina(8);
-        if(i%2===0){doc.setFillColor(248,251,255); doc.rect(M,y-3.5,PW-2*M,6,'F');}
-        doc.setTextColor(40,60,90); doc.setFontSize(8); doc.setFont('helvetica','normal');
-        doc.text(e.nome,M+3,y);
-        doc.setTextColor(90,130,180);
-        doc.text(`${e.tel||'—'} · ${e.email||'—'}`,PW/2,y);
-        doc.setFont('helvetica','bold'); doc.setTextColor(21,101,192);
-        const con=DB.contratos.filter(c=>c.cli===e.nome&&c.s==='at').length;
-        doc.text(con?`${con} contrato(s)`:'Sem contrato',PW-M-3,y,{align:'right'});
-        y+=6;
-      });
-      if(DB.empresas.length>20){
-        doc.setTextColor(150,170,200); doc.setFontSize(8);
-        doc.text(`... e mais ${DB.empresas.length-20} clientes.`,M+3,y); y+=8;
-      }
-    } else {
-      doc.setTextColor(150,170,200); doc.setFontSize(8);
-      doc.text('Nenhum cliente cadastrado.',M+3,y); y+=8;
-    }
-
-    // ── 4. CONTRATOS ────────────────────────────
-    checkPagina(35);
-    secHeader('CONTRATOS ATIVOS','📄');
-    const contrAtivos=DB.contratos.filter(c=>c.s==='at');
-    if(contrAtivos.length){
-      contrAtivos.forEach((c,i)=>{
-        checkPagina(8);
-        if(i%2===0){doc.setFillColor(248,251,255); doc.rect(M,y-3.5,PW-2*M,6,'F');}
-        doc.setTextColor(40,60,90); doc.setFontSize(8); doc.setFont('helvetica','normal');
-        doc.text(`${c.cid} · ${c.cli}`,M+3,y);
-        doc.setTextColor(90,130,180);
-        doc.text(c.srv||'—',PW/2,y);
-        doc.setFont('helvetica','bold'); doc.setTextColor(0,150,100);
-        doc.text(`${fmtR(c.val)}/mês`,PW-M-3,y,{align:'right'});
-        y+=6;
-      });
-      doc.setTextColor(21,101,192); doc.setFontSize(8.5); doc.setFont('helvetica','bold');
-      const totalContr=contrAtivos.reduce((a,c)=>a+parseR(c.val),0);
-      doc.text(`Total mensal: ${fmtR(totalContr)}`,PW-M-3,y+3,{align:'right'}); y+=8;
-    } else {
-      doc.setTextColor(150,170,200); doc.setFontSize(8);
-      doc.text('Nenhum contrato ativo.',M+3,y); y+=8;
-    }
-
-    // ── 5. ATENDIMENTOS / OS ────────────────────
-    checkPagina(35);
-    secHeader('ATENDIMENTOS (OS)','🔧');
-    if(DB.os.length){
-      DB.os.slice(0,15).forEach((o,i)=>{
-        checkPagina(8);
-        if(i%2===0){doc.setFillColor(248,251,255); doc.rect(M,y-3.5,PW-2*M,6,'F');}
-        doc.setTextColor(40,60,90); doc.setFontSize(8); doc.setFont('helvetica','normal');
-        doc.text(`${o.oid} · ${o.cli}`,M+3,y);
-        doc.setTextColor(90,130,180);
-        doc.text(`${o.tipo||'—'} · Téc: ${o.tec||'—'}`,PW/2,y);
-        const stCor={at:[0,150,100],pr:[200,140,0],em:[21,101,192]}[o.s]||[150,150,150];
-        doc.setTextColor(...stCor); doc.setFont('helvetica','bold');
-        doc.text({at:'Concluída',pr:'Em aberto',em:'Em andamento'}[o.s]||o.s,PW-M-3,y,{align:'right'});
-        y+=6;
-      });
-    } else {
-      doc.setTextColor(150,170,200); doc.setFontSize(8);
-      doc.text('Nenhuma OS registrada.',M+3,y); y+=8;
-    }
-
-    // ── 6. COBRANÇAS ────────────────────────────
-    checkPagina(35);
-    secHeader('COBRANÇAS','💸');
-    const cobsHoje=(DB.cobrancas||[]);
-    if(cobsHoje.length){
-      cobsHoje.slice(0,15).forEach((c,i)=>{
-        checkPagina(8);
-        if(i%2===0){doc.setFillColor(248,251,255); doc.rect(M,y-3.5,PW-2*M,6,'F');}
-        doc.setTextColor(40,60,90); doc.setFontSize(8); doc.setFont('helvetica','normal');
-        doc.text(c.cliente,M+3,y);
-        doc.setTextColor(90,130,180);
-        doc.text(c.descricao||'—',PW/2,y);
-        doc.setFont('helvetica','bold');
-        doc.setTextColor(c.pago?0:200, c.pago?150:50, c.pago?100:50);
-        doc.text(`${fmtR(c.valor)} · ${c.pago?'✓ Pago':'Pendente'}`,PW-M-3,y,{align:'right'});
-        y+=6;
-      });
-    } else {
-      doc.setTextColor(150,170,200); doc.setFontSize(8);
-      doc.text('Nenhuma cobrança registrada.',M+3,y); y+=8;
-    }
-
-    // ── 7. AGENDA DO DIA ────────────────────────
-    checkPagina(25);
-    secHeader('AGENDA DO DIA','📅');
-    const agHoje=[...(DB.agenda?.h||[]),...(DB.agenda?.s||[]).filter(e=>e.data===hojeSimples)];
-    if(agHoje.length){
-      agHoje.forEach((ev,i)=>{
-        checkPagina(8);
-        if(i%2===0){doc.setFillColor(248,251,255); doc.rect(M,y-3.5,PW-2*M,6,'F');}
-        doc.setTextColor(40,60,90); doc.setFontSize(8); doc.setFont('helvetica','normal');
-        doc.text(`${ev.h||'—'} · ${ev.t||ev.titulo||'—'}`,M+3,y);
-        doc.setTextColor(90,130,180);
-        doc.text(`${ev.cli||''}${ev.tec?' · Téc: '+ev.tec:''}`,PW-M-3,y,{align:'right'});
-        y+=6;
-      });
-    } else {
-      doc.setTextColor(150,170,200); doc.setFontSize(8);
-      doc.text('Nenhum evento registrado.',M+3,y); y+=8;
-    }
-
-    // ── 8. TAREFAS ──────────────────────────────
-    checkPagina(25);
-    secHeader('TAREFAS','✅');
-    if(DB.tasks.length){
-      DB.tasks.slice(0,15).forEach((t,i)=>{
-        checkPagina(8);
-        if(i%2===0){doc.setFillColor(248,251,255); doc.rect(M,y-3.5,PW-2*M,6,'F');}
-        doc.setTextColor(40,60,90); doc.setFontSize(8); doc.setFont('helvetica','normal');
-        const txt=(t.txt||'').split('\n')[0].substring(0,60);
-        doc.text(`${t.done?'✓':'○'} ${txt}`,M+3,y);
-        doc.setTextColor(t.done?0:200, t.done?150:80, t.done?100:0);
-        doc.setFont('helvetica','bold');
-        doc.text(t.done?'Concluída':`${t.due||'Sem data'}`,PW-M-3,y,{align:'right'});
-        y+=6;
-      });
-    } else {
-      doc.setTextColor(150,170,200); doc.setFontSize(8);
-      doc.text('Nenhuma tarefa registrada.',M+3,y); y+=8;
-    }
-
-    // ── 9. EQUIPE ───────────────────────────────
-    checkPagina(25);
-    secHeader('EQUIPE TÉCNICA','👷');
-    if(DB.tecnicos.length){
-      DB.tecnicos.forEach((t,i)=>{
-        checkPagina(8);
-        const nome=typeof t==='string'?t:t.nome;
-        const osT=DB.os.filter(o=>(o.tec||'').includes(nome)).length;
-        if(i%2===0){doc.setFillColor(248,251,255); doc.rect(M,y-3.5,PW-2*M,6,'F');}
-        doc.setTextColor(40,60,90); doc.setFontSize(8); doc.setFont('helvetica','normal');
-        doc.text(nome,M+3,y);
-        doc.setTextColor(90,130,180);
-        doc.text(typeof t==='object'&&t.esp?t.esp:'—',PW/2,y);
-        doc.setFont('helvetica','bold'); doc.setTextColor(21,101,192);
-        doc.text(`${osT} OS`,PW-M-3,y,{align:'right'});
-        y+=6;
-      });
-    } else {
-      doc.setTextColor(150,170,200); doc.setFontSize(8);
-      doc.text('Nenhum técnico cadastrado.',M+3,y); y+=8;
-    }
-
-    // ── 10. METAS ───────────────────────────────
-    if(DB.metas?.length){
-      checkPagina(35);
-      secHeader('METAS DO MÊS','🎯');
-      DB.metas.forEach((m,i)=>{
-        checkPagina(10);
+<!-- METAS -->
+${DB.metas?.length?`
+<div class="secao">
+  <div class="sec-titulo"><span class="ic">🎯</span><h3>Metas do Mes</h3></div>
+  <table>
+    <thead><tr><th>Meta</th><th>Tipo</th><th>Progresso</th><th>Atual</th><th>Alvo</th><th>%</th></tr></thead>
+    <tbody>
+      ${DB.metas.map(m=>{
         const atual=calcValorMeta(m);
         const pct=Math.min(Math.round(atual/(m.alvo||1)*100),100);
-        if(i%2===0){doc.setFillColor(248,251,255); doc.rect(M,y-3.5,PW-2*M,8,'F');}
-        doc.setTextColor(40,60,90); doc.setFontSize(8); doc.setFont('helvetica','normal');
-        doc.text(m.nome,M+3,y);
-        // Barra de progresso
-        const bx=M+80, bw=60;
-        doc.setFillColor(220,235,255); doc.rect(bx,y-3,bw,4,'F');
-        const cor=pct>=100?[0,150,100]:pct>=70?[200,140,0]:[21,101,192];
-        doc.setFillColor(...cor); doc.rect(bx,y-3,bw*pct/100,4,'F');
-        doc.setFont('helvetica','bold'); doc.setTextColor(...cor);
-        doc.text(`${pct}% (${atual}/${m.alvo} ${m.unid||''})`,PW-M-3,y,{align:'right'});
-        y+=8;
-      });
-    }
+        const cor=pct>=100?'#2e7d32':pct>=70?'#f57f17':'#1565C0';
+        return `<tr>
+          <td><strong>${m.nome}</strong></td>
+          <td>${m.tipo||'-'}</td>
+          <td><div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${cor}"></div></div></td>
+          <td class="valor">${atual} ${m.unid||''}</td>
+          <td>${m.alvo} ${m.unid||''}</td>
+          <td style="font-weight:700;color:${cor}">${pct}%</td>
+        </tr>`;}).join('')}
+    </tbody>
+  </table>
+</div>`:''}
 
-    // ── RODAPÉ ──────────────────────────────────
-    const totalPags=doc.getNumberOfPages();
-    for(let p=1;p<=totalPags;p++){
-      doc.setPage(p);
-      doc.setFillColor(21,101,192); doc.rect(0,285,PW,12,'F');
-      doc.setTextColor(255,255,255); doc.setFontSize(7.5); doc.setFont('helvetica','normal');
-      doc.text('Grupo Aliança Monitoramento · Segurança Eletrônica',M,292);
-      doc.text(`Página ${p} de ${totalPags} · ${hojeSimples}`,PW-M,292,{align:'right'});
-    }
+<!-- EQUIPE -->
+<div class="secao">
+  <div class="sec-titulo"><span class="ic">👷</span><h3>Equipe Tecnica</h3></div>
+  ${DB.tecnicos.length?`
+  <table>
+    <thead><tr><th>Tecnico</th><th>Especialidade</th><th>Contato</th><th>OS Realizadas</th><th>Diaria</th></tr></thead>
+    <tbody>
+      ${DB.tecnicos.map(t=>{
+        const nome=typeof t==='string'?t:t.nome;
+        const osT=DB.os.filter(o=>(o.tec||'').includes(nome)).length;
+        return `<tr>
+          <td><strong>${nome}</strong></td>
+          <td>${typeof t==='object'&&t.esp?t.esp:'-'}</td>
+          <td>${typeof t==='object'&&t.tel?t.tel:'-'}</td>
+          <td style="text-align:center">${osT}</td>
+          <td>${typeof t==='object'&&t.diaria?fmtR(t.diaria):'-'}</td>
+        </tr>`;}).join('')}
+    </tbody>
+  </table>`:`<p class="sem-dados">Nenhum tecnico cadastrado.</p>`}
+</div>
 
-    const nomeArq=`Relatorio_Diario_${hojeSimples.replace(/\//g,'-')}.pdf`;
-    doc.save(nomeArq);
-    toast(`✅ Relatório gerado: ${nomeArq}`);
-  }catch(e){
-    toast('❌ Erro ao gerar relatório: '+e.message);
-    console.error(e);
-  }
+<!-- FINANCEIRO -->
+<div class="secao">
+  <div class="sec-titulo"><span class="ic">💰</span><h3>Resumo Financeiro</h3></div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px">
+    <div style="background:#e8f5e9;border-radius:8px;padding:12px;text-align:center">
+      <div style="font-size:9px;color:#5c8ab8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Receita Total</div>
+      <div style="font-size:16px;font-weight:700;color:#1565C0">${fmtR(r.recTotal)}</div>
+    </div>
+    <div style="background:#e3f2fd;border-radius:8px;padding:12px;text-align:center">
+      <div style="font-size:9px;color:#5c8ab8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Entradas</div>
+      <div style="font-size:16px;font-weight:700;color:#2e7d32">${fmtR(r.entradas)}</div>
+    </div>
+    <div style="background:#fce4ec;border-radius:8px;padding:12px;text-align:center">
+      <div style="font-size:9px;color:#5c8ab8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Saidas</div>
+      <div style="font-size:16px;font-weight:700;color:#c62828">${fmtR(r.saidas)}</div>
+    </div>
+    <div style="background:${r.saldo>=0?'#e8f5e9':'#fce4ec'};border-radius:8px;padding:12px;text-align:center">
+      <div style="font-size:9px;color:#5c8ab8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Saldo</div>
+      <div style="font-size:16px;font-weight:700;color:${r.saldo>=0?'#2e7d32':'#c62828'}">${fmtR(r.saldo)}</div>
+    </div>
+  </div>
+  ${DB.movs.length?`
+  <table>
+    <thead><tr><th>Descricao</th><th>Referencia</th><th>Tipo</th><th>Valor</th></tr></thead>
+    <tbody>
+      ${DB.movs.slice(0,10).map(m=>`
+        <tr>
+          <td>${m.desc||'-'}</td>
+          <td>${m.ref||'-'}</td>
+          <td><span class="badge ${m.tipo==='in'?'badge-ok':'badge-err'}">${m.tipo==='in'?'Entrada':'Saida'}</span></td>
+          <td class="${m.tipo==='in'?'valor-verde':'valor-vermelho'}">${m.tipo==='in'?'+':'-'} ${fmtR(m.val)}</td>
+        </tr>`).join('')}
+    </tbody>
+  </table>`:''}
+</div>
+
+<!-- RODAPE -->
+<div class="rodape">
+  <div><strong>Grupo Alianca Monitoramento</strong> &nbsp;·&nbsp; Seguranca Eletronica Profissional</div>
+  <div>Relatorio Diario &nbsp;·&nbsp; ${hojeStr}</div>
+  <div>Gerado as ${horaStr}</div>
+</div>
+
+</body></html>`;
+
+  // Abre em nova aba
+  const win=window.open('','_blank');
+  win.document.write(html);
+  win.document.close();
+  toast('📊 Relatorio aberto! Clique em "Imprimir / Salvar PDF"');
 }
 
 
