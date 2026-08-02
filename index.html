@@ -2462,7 +2462,7 @@ function abrirNovaTarefa(){
     const dataHora=data?(data+(hora?'T'+hora:'')):null;
     const novaTask={
       id:uid(), txt:txt+(obs?'\n'+obs:''),
-      due:data?new Date(data).toLocaleDateString('pt-BR'):'Sem data',
+      due:data?parseDateLocal(data).toLocaleDateString('pt-BR'):'Sem data',
       dataHora, hora, pri:priCores[pri], pri2:pri,
       cliente:cli, done:false, per:'h'
     };
@@ -3842,8 +3842,12 @@ const M={
       const corEvento=corMap[tipo]||'#7a96bb';
       let horaFmt='', dataFmt='';
       if(dataRaw){
-        const d=new Date(dataRaw);
-        horaFmt=d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+        const d=parseDateLocal(dataRaw);
+        // Pega hora do campo datetime-local
+        if(dataRaw.includes('T')){
+          const [,h]=dataRaw.split('T');
+          horaFmt=h.slice(0,5);
+        }
         dataFmt=d.toLocaleDateString('pt-BR');
       } else {
         horaFmt=nowStr(); dataFmt=new Date().toLocaleDateString('pt-BR');
@@ -8104,6 +8108,14 @@ function verificarVencimentosDia(){
   setTimeout(()=>mostrarResumoDia(itens), 1000);
 }
 
+// ── Utilitário de data sem fuso horário ──────────
+function parseDateLocal(str){
+  // Evita bug de fuso: "2026-08-03" virar 02/08 no Brasil
+  if(!str) return null;
+  const [y,m,d]=(str.includes('T')?str.split('T')[0]:str).split('-').map(Number);
+  return new Date(y, m-1, d); // meia-noite local
+}
+
 function coletarVencimentosDia(){
   const hoje=new Date(); hoje.setHours(0,0,0,0);
   const amanha=new Date(hoje); amanha.setDate(amanha.getDate()+1);
@@ -8111,18 +8123,20 @@ function coletarVencimentosDia(){
 
   // Tarefas vencendo hoje
   DB.tasks.filter(t=>!t.done&&t.dataHora).forEach(t=>{
-    const d=new Date(t.dataHora); d.setHours(0,0,0,0);
+    const d=parseDateLocal(t.dataHora); if(!d) return;
+    d.setHours(0,0,0,0);
     const diff=Math.floor((d-hoje)/(1000*60*60*24));
     if(diff===0) itens.push({ic:'✅',titulo:'Tarefa para hoje',sub:t.txt,tipo:'tarefa',urgente:false,obj:t});
-    if(diff<0) itens.push({ic:'🚨',titulo:'Tarefa atrasada',sub:`${t.txt} (${Math.abs(diff)}d atraso)`,tipo:'tarefa',urgente:true,obj:t});
+    if(diff<0)  itens.push({ic:'🚨',titulo:'Tarefa atrasada',sub:`${t.txt} (${Math.abs(diff)}d atraso)`,tipo:'tarefa',urgente:true,obj:t});
   });
 
-  // Cobranças vencendo hoje ou atrasadas
+  // Cobranças
   (DB.cobrancas||[]).filter(c=>!c.pago&&c.vencimento).forEach(c=>{
-    const d=new Date(c.vencimento); d.setHours(0,0,0,0);
+    const d=parseDateLocal(c.vencimento); if(!d) return;
+    d.setHours(0,0,0,0);
     const diff=Math.floor((d-hoje)/(1000*60*60*24));
     if(diff===0) itens.push({ic:'💸',titulo:`Cobrança vence hoje — ${c.cliente}`,sub:`${fmtR(c.valor)} · ${c.descricao}`,tipo:'cobranca',urgente:true,obj:c});
-    if(diff<0) itens.push({ic:'🚨',titulo:`Cobrança atrasada — ${c.cliente}`,sub:`${fmtR(c.valor)} · ${Math.abs(diff)} dia(s) em atraso`,tipo:'cobranca',urgente:true,obj:c});
+    if(diff<0)  itens.push({ic:'🚨',titulo:`Cobrança atrasada — ${c.cliente}`,sub:`${fmtR(c.valor)} · ${Math.abs(diff)} dia(s) em atraso`,tipo:'cobranca',urgente:true,obj:c});
     if(diff===1) itens.push({ic:'⏰',titulo:`Cobrança vence amanhã — ${c.cliente}`,sub:`${fmtR(c.valor)} · ${c.descricao}`,tipo:'cobranca',urgente:false,obj:c});
   });
 
@@ -8140,7 +8154,7 @@ function coletarVencimentosDia(){
   // OS abertas há mais de 3 dias
   DB.os.filter(o=>o.s!=='at').forEach(o=>{
     if(o.dataRaw){
-      const d=new Date(o.dataRaw);
+      const d=parseDateLocal(o.dataRaw); if(!d) return;
       const diff=Math.floor((hoje-d)/(1000*60*60*24));
       if(diff>=3) itens.push({ic:'🔧',titulo:`OS atrasada — ${o.cli}`,sub:`${o.tipo||o.oid} · ${diff} dias em aberto`,tipo:'os',urgente:diff>=5,obj:o});
     }
