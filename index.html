@@ -1666,15 +1666,39 @@ function advDeal(id,dir){
 function rPipeline(){
   const b=$('pipe-board');if(!b)return;
   const adm=isAdmin();
+  const ultimoStage=DB.stages.length-1;
   b.innerHTML=DB.stages.map((sg,si)=>{
-    let deals=DB.deals.filter(d=>d.stage===si);
+    const isFechado=si===ultimoStage;
+    let deals=DB.deals.filter(d=>d.stage===si&&!d.cancelado);
     if(_pf)deals=deals.filter(d=>d.tag===_pf);
-    const tot=deals.filter(d=>!d.cancelado).reduce((a,d)=>a+parseR(d.val),0);
+    const tot=deals.reduce((a,d)=>a+parseR(d.val),0);
+    const cancelados=DB.deals.filter(d=>d.stage===si&&d.cancelado);
+
+    // Coluna Fechado — mostra resumo compacto, não cards completos
+    if(isFechado){
+      return `<div class="stg">
+        <div class="sth"><span class="stn" style="color:${sg.c}">${sg.n}</span><span class="stc">${deals.length}</span></div>
+        <div class="stb" style="background:${sg.c}"></div>
+        <div style="background:rgba(0,196,140,.08);border:1px solid rgba(0,196,140,.2);border-radius:10px;padding:12px;text-align:center;margin-bottom:8px">
+          <div style="font-size:22px;font-weight:900;color:var(--green)">${fmtR(Math.round(tot))}</div>
+          <div style="font-size:11px;color:var(--t3);margin-top:2px">${deals.length} venda(s) fechada(s)</div>
+        </div>
+        ${deals.slice(0,4).map(d=>`
+          <div style="background:rgba(0,196,140,.06);border:1px solid rgba(0,196,140,.15);border-radius:9px;padding:8px;margin-bottom:5px">
+            <div style="font-size:12px;font-weight:700;color:var(--green)">✅ ${d.emp}</div>
+            <div style="font-size:11px;color:var(--t2);margin-top:2px">${fmtR(d.val)} · ${TAGL[d.tag]||d.tag||''}</div>
+            ${adm?`<button onclick="moverParaFunil(${d.id})" style="font-size:10px;color:var(--t3);background:none;border:none;cursor:pointer;padding:2px 0;margin-top:2px">↩ Reabrir no funil</button>`:''}
+          </div>`).join('')}
+        ${deals.length>4?`<div style="text-align:center;font-size:11px;color:var(--t3);padding:4px">+${deals.length-4} mais...</div>`:''}
+        ${cancelados.length?`<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--bd);font-size:10px;color:#ef4444;text-align:center">🚫 ${cancelados.length} cancelado(s)</div>`:''}
+      </div>`;
+    }
+
     return `<div class="stg">
-      <div class="sth"><span class="stn" style="color:${sg.c}">${sg.n}</span><span class="stc">${deals.filter(d=>!d.cancelado).length}</span></div>
+      <div class="sth"><span class="stn" style="color:${sg.c}">${sg.n}</span><span class="stc">${deals.length}</span></div>
       <div class="stb" style="background:${sg.c}"></div>
       ${deals.length?deals.map(d=>{
-        const podeAv=d.stage<DB.stages.length-1&&!d.cancelado;
+        const podeAv=d.stage<ultimoStage&&!d.cancelado;
         const podeRe=d.stage>0&&!d.cancelado;
         const cancelado=d.cancelado;
         return `<div class="deal" id="deal-${d.id}" style="${cancelado?'opacity:.45;filter:grayscale(1);':''}">
@@ -1700,6 +1724,12 @@ function rPipeline(){
     const d=DB.deals.filter(x=>x.stage===si&&!x.cancelado),t=d.reduce((a,x)=>a+parseR(x.val),0);
     return `<div class="kpi" style="border-top:3px solid ${sg.c}"><div class="kl">${sg.n}</div><div class="kv" style="font-size:18px">${fmtR(t)}</div><div class="kd neu">${d.length} negócios</div></div>`;
   }).join('');
+}
+function moverParaFunil(id){
+  const d=DB.deals.find(x=>x.id===id); if(!d) return;
+  d.stage=DB.stages.length-2;
+  rPipeline(); updKPI(); autoSave();
+  toast(`↩ ${d.emp} voltou para o funil!`);
 }
 function editDeal(id,f,v){const d=DB.deals.find(x=>x.id===id);if(d){d[f]=v.trim();}}
 function editDealVal(id,v){const d=DB.deals.find(x=>x.id===id);if(d){d.val=String(parseR(v));updKPI();}}
