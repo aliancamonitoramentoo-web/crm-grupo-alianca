@@ -8183,11 +8183,14 @@ function mostrarResumoDia(itens){
         </div>`).join('')}
     </div>`:''}
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button onclick="enviarResumoWhatsApp()" style="flex:1;padding:10px;background:rgba(0,196,140,.12);border:1px solid rgba(0,196,140,.3);border-radius:9px;color:var(--green);font-size:12px;font-weight:700;cursor:pointer">
-        💬 Enviar resumo no WhatsApp
-      </button>
+      ${EQUIPE_NUMEROS.map(m=>`
+        <a href="https://wa.me/${m.tel}?text=${encodeURIComponent(montarTextoResumo())}" target="_blank"
+          onclick="M.close()"
+          style="flex:1;padding:10px;background:rgba(0,196,140,.1);border:1px solid rgba(0,196,140,.25);border-radius:9px;color:var(--green);font-size:12px;font-weight:700;cursor:pointer;text-align:center;text-decoration:none;display:block">
+          💬 WhatsApp — ${m.nome}
+        </a>`).join('')}
       <button onclick="enviarResumoEmail()" style="flex:1;padding:10px;background:rgba(61,155,255,.1);border:1px solid rgba(61,155,255,.3);border-radius:9px;color:#3d9bff;font-size:12px;font-weight:700;cursor:pointer">
-        📧 Enviar por E-mail
+        📧 E-mail
       </button>
     </div>`;
 
@@ -8202,13 +8205,31 @@ const EQUIPE_NUMEROS = [
   {nome:'Nivaldo',tel:'5581997111402'},
 ];
 
-// Envia WhatsApp para toda a equipe
-function notificarEquipeWhatsApp(msg){
-  EQUIPE_NUMEROS.forEach((m,i)=>{
-    setTimeout(()=>{
-      window.open(`https://wa.me/${m.tel}?text=${encodeURIComponent(msg)}`,'_blank');
-    }, i*1500); // abre um de cada vez com 1.5s de intervalo
-  });
+// Envia WhatsApp para toda a equipe — mostra botões separados
+function notificarEquipeWhatsApp(msg, titulo=''){
+  // Mostra mini-modal com botão para cada membro
+  const div=document.createElement('div');
+  div.id='wa-equipe-modal';
+  div.style.cssText='position:fixed;bottom:20px;right:20px;background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:14px;z-index:9999;max-width:280px;box-shadow:0 8px 24px rgba(0,0,0,.4)';
+  div.innerHTML=`
+    <div style="font-size:12px;font-weight:700;color:var(--gold);margin-bottom:10px">💬 Enviar notificação${titulo?' — '+titulo:''}</div>
+    ${EQUIPE_NUMEROS.map(m=>`
+      <a href="https://wa.me/${m.tel}?text=${encodeURIComponent(msg)}" target="_blank"
+        onclick="this.parentElement.parentElement.remove()"
+        style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(0,196,140,.1);border:1px solid rgba(0,196,140,.25);border-radius:8px;margin-bottom:6px;text-decoration:none;cursor:pointer">
+        <span style="font-size:18px">📱</span>
+        <div>
+          <div style="font-size:12px;font-weight:700;color:var(--green)">${m.nome}</div>
+          <div style="font-size:10px;color:var(--t3)">${m.tel.replace('55','').replace(/(\d{2})(\d{5})(\d{4})/,'($1) $2-$3')}</div>
+        </div>
+      </a>`).join('')}
+    <button onclick="document.getElementById('wa-equipe-modal').remove()" 
+      style="width:100%;padding:6px;background:transparent;border:1px solid var(--bd);border-radius:7px;color:var(--t3);font-size:11px;cursor:pointer;font-family:var(--F);margin-top:2px">
+      Fechar
+    </button>`;
+  document.body.appendChild(div);
+  // Remove automaticamente após 30 segundos
+  setTimeout(()=>div.remove(), 30000);
 }
 
 // Notifica equipe ao criar tarefa
