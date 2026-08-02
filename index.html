@@ -622,6 +622,17 @@ tr:hover td{background:rgba(255,255,255,.017);}
 
 <!-- RELATÓRIOS -->
 <div class="pg" id="pg-relatorios">
+  <!-- Botão Relatório Diário destaque -->
+  <div style="background:linear-gradient(135deg,rgba(21,101,192,.15),rgba(21,101,192,.05));border:1px solid rgba(21,101,192,.3);border-radius:12px;padding:16px;display:flex;align-items:center;gap:16px;margin-bottom:4px">
+    <div style="font-size:40px">📊</div>
+    <div style="flex:1">
+      <div style="font-size:14px;font-weight:700;color:#3d9bff">Relatório Diário Completo</div>
+      <div style="font-size:12px;color:var(--t2);margin-top:3px">PDF com vendas, clientes, contratos, OS, cobranças, agenda, tarefas, equipe e metas de hoje</div>
+    </div>
+    <button class="btn bg" onclick="gerarRelatorioDiario()" style="padding:10px 20px;font-size:13px;font-weight:700;background:#1565C0;border-color:#1565C0;white-space:nowrap">
+      📄 Gerar PDF
+    </button>
+  </div>
   <div class="g2">
     <div class="card"><div class="ch"><span class="ct">Receita por Contrato</span></div><div class="cb"><div style="height:178px"><canvas id="ch-ano"></canvas></div></div></div>
     <div class="card"><div class="ch"><span class="ct">Funil de Conversão</span></div><div class="cb" id="funil"></div></div>
@@ -8312,6 +8323,329 @@ function verResumoDia(){
   const itens=coletarVencimentosDia();
   if(!itens.length){toast('✅ Nenhum item pendente para hoje!');return;}
   mostrarResumoDia(itens);
+}
+
+
+// ═══════════════════════════════════════════════════
+//  📊 RELATÓRIO DIÁRIO — PDF PROFISSIONAL
+// ═══════════════════════════════════════════════════
+
+function gerarRelatorioDiario(){
+  try{
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const PW=210, M=14;
+    const hoje=new Date();
+    const hojeStr=hoje.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+    const hojeSimples=hoje.toLocaleDateString('pt-BR');
+    let y=0;
+
+    // ── Funções auxiliares ──────────────────────
+    function setFont(size,style='normal',r=220,g=235,b=255){
+      doc.setFontSize(size); doc.setFont('helvetica',style);
+      doc.setTextColor(r,g,b);
+    }
+    function secHeader(titulo,icone=''){
+      y+=4;
+      doc.setFillColor(21,101,192); doc.rect(M,y,PW-2*M,7,'F');
+      doc.setTextColor(255,255,255); doc.setFontSize(9); doc.setFont('helvetica','bold');
+      doc.text(`${icone} ${titulo}`,M+3,y+5);
+      y+=11;
+    }
+    function rowPar(label,valor,cinza=false){
+      if(cinza){doc.setFillColor(240,246,255); doc.rect(M,y-4,PW-2*M,7,'F');}
+      doc.setTextColor(90,130,180); doc.setFontSize(8.5); doc.setFont('helvetica','normal');
+      doc.text(label,M+3,y);
+      doc.setTextColor(30,50,80); doc.setFont('helvetica','bold');
+      doc.text(String(valor),PW-M-3,y,{align:'right'});
+      y+=6.5;
+    }
+    function linha(){
+      doc.setDrawColor(200,220,245); doc.setLineWidth(0.2);
+      doc.line(M,y-2,PW-M,y-2); y+=1;
+    }
+    function checkPagina(space=20){
+      if(y+space>275){
+        doc.addPage();
+        desenharCabecalhoMini();
+        y=30;
+      }
+    }
+
+    function desenharCabecalhoMini(){
+      doc.setFillColor(21,101,192); doc.rect(0,0,PW,12,'F');
+      doc.setTextColor(255,255,255); doc.setFontSize(8); doc.setFont('helvetica','bold');
+      doc.text('Grupo Aliança Monitoramento — Relatório Diário',M,8);
+      doc.text(hojeSimples,PW-M,8,{align:'right'});
+    }
+
+    // ── CAPA ────────────────────────────────────
+    // Fundo azul topo
+    doc.setFillColor(13,32,74); doc.rect(0,0,PW,55,'F');
+    doc.setFillColor(21,101,192); doc.rect(0,45,PW,18,'F');
+
+    // Logo área
+    doc.setFillColor(245,166,35); doc.roundedRect(M,10,18,18,3,3,'F');
+    doc.setTextColor(0,0,0); doc.setFontSize(14); doc.setFont('helvetica','bold');
+    doc.text('GA',M+4.5,22);
+
+    // Nome empresa
+    doc.setTextColor(255,255,255); doc.setFontSize(16); doc.setFont('helvetica','bold');
+    doc.text('Grupo Aliança Monitoramento',M+22,20);
+    doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(180,210,255);
+    doc.text('Segurança Eletrônica Profissional',M+22,27);
+
+    // Título relatório
+    doc.setTextColor(255,255,255); doc.setFontSize(13); doc.setFont('helvetica','bold');
+    doc.text('RELATÓRIO DIÁRIO DE ATIVIDADES',M,54);
+
+    // Data e hora
+    doc.setFillColor(240,246,255); doc.rect(0,63,PW,14,'F');
+    doc.setTextColor(21,101,192); doc.setFontSize(11); doc.setFont('helvetica','bold');
+    doc.text(hojeStr.charAt(0).toUpperCase()+hojeStr.slice(1),PW/2,72,{align:'center'});
+    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(90,130,180);
+    doc.text(`Gerado em: ${hoje.toLocaleString('pt-BR')}`,PW/2,78,{align:'center'});
+    y=88;
+
+    // ── 1. RESUMO EXECUTIVO ─────────────────────
+    secHeader('RESUMO EXECUTIVO','📊');
+
+    const r=calcReceita();
+    const dealsHoje=DB.deals.filter(d=>d.stage===DB.stages.length-1&&!d.cancelado);
+    const clientesHoje=DB.empresas.length;
+    const osHoje=DB.os.filter(o=>o.s==='at').length;
+    const contratosAtivos=DB.contratos.filter(c=>c.s==='at').length;
+    const cobrancasPendentes=(DB.cobrancas||[]).filter(c=>!c.pago).length;
+    const tarefasPend=DB.tasks.filter(t=>!t.done).length;
+
+    rowPar('💰 Receita Total',fmtR(r.recTotal),false);
+    rowPar('📄 Contratos Ativos',contratosAtivos,true);
+    rowPar('🏆 Vendas Fechadas',dealsHoje.length,false);
+    rowPar('👥 Total de Clientes',clientesHoje,true);
+    rowPar('🔧 OS Concluídas',osHoje,false);
+    rowPar('💸 Cobranças Pendentes',cobrancasPendentes,true);
+    rowPar('✅ Tarefas Pendentes',tarefasPend,false);
+    y+=3;
+
+    // ── 2. VENDAS E PIPELINE ────────────────────
+    checkPagina(40);
+    secHeader('PIPELINE DE VENDAS','🏆');
+    if(DB.deals.length){
+      DB.stages.forEach((sg,si)=>{
+        const deals=DB.deals.filter(d=>d.stage===si&&!d.cancelado);
+        if(!deals.length) return;
+        const tot=deals.reduce((a,d)=>a+parseR(d.val),0);
+        doc.setTextColor(21,101,192); doc.setFontSize(8.5); doc.setFont('helvetica','bold');
+        doc.text(`${sg.n} (${deals.length} negócio${deals.length>1?'s':''} · ${fmtR(tot)})`,M+3,y);
+        y+=5.5;
+        deals.forEach((d,i)=>{
+          checkPagina(8);
+          if(i%2===0){doc.setFillColor(248,251,255); doc.rect(M,y-3.5,PW-2*M,6,'F');}
+          doc.setTextColor(40,60,90); doc.setFontSize(8); doc.setFont('helvetica','normal');
+          doc.text(`   ${d.emp}`,M+3,y);
+          doc.setFont('helvetica','bold'); doc.setTextColor(21,101,192);
+          doc.text(fmtR(d.val),PW-M-3,y,{align:'right'});
+          y+=6;
+        });
+        y+=2;
+      });
+    } else {
+      doc.setTextColor(150,170,200); doc.setFontSize(8);
+      doc.text('Nenhuma venda registrada.',M+3,y); y+=8;
+    }
+
+    // ── 3. CLIENTES ─────────────────────────────
+    checkPagina(35);
+    secHeader('CLIENTES CADASTRADOS','👥');
+    if(DB.empresas.length){
+      DB.empresas.slice(0,20).forEach((e,i)=>{
+        checkPagina(8);
+        if(i%2===0){doc.setFillColor(248,251,255); doc.rect(M,y-3.5,PW-2*M,6,'F');}
+        doc.setTextColor(40,60,90); doc.setFontSize(8); doc.setFont('helvetica','normal');
+        doc.text(e.nome,M+3,y);
+        doc.setTextColor(90,130,180);
+        doc.text(`${e.tel||'—'} · ${e.email||'—'}`,PW/2,y);
+        doc.setFont('helvetica','bold'); doc.setTextColor(21,101,192);
+        const con=DB.contratos.filter(c=>c.cli===e.nome&&c.s==='at').length;
+        doc.text(con?`${con} contrato(s)`:'Sem contrato',PW-M-3,y,{align:'right'});
+        y+=6;
+      });
+      if(DB.empresas.length>20){
+        doc.setTextColor(150,170,200); doc.setFontSize(8);
+        doc.text(`... e mais ${DB.empresas.length-20} clientes.`,M+3,y); y+=8;
+      }
+    } else {
+      doc.setTextColor(150,170,200); doc.setFontSize(8);
+      doc.text('Nenhum cliente cadastrado.',M+3,y); y+=8;
+    }
+
+    // ── 4. CONTRATOS ────────────────────────────
+    checkPagina(35);
+    secHeader('CONTRATOS ATIVOS','📄');
+    const contrAtivos=DB.contratos.filter(c=>c.s==='at');
+    if(contrAtivos.length){
+      contrAtivos.forEach((c,i)=>{
+        checkPagina(8);
+        if(i%2===0){doc.setFillColor(248,251,255); doc.rect(M,y-3.5,PW-2*M,6,'F');}
+        doc.setTextColor(40,60,90); doc.setFontSize(8); doc.setFont('helvetica','normal');
+        doc.text(`${c.cid} · ${c.cli}`,M+3,y);
+        doc.setTextColor(90,130,180);
+        doc.text(c.srv||'—',PW/2,y);
+        doc.setFont('helvetica','bold'); doc.setTextColor(0,150,100);
+        doc.text(`${fmtR(c.val)}/mês`,PW-M-3,y,{align:'right'});
+        y+=6;
+      });
+      doc.setTextColor(21,101,192); doc.setFontSize(8.5); doc.setFont('helvetica','bold');
+      const totalContr=contrAtivos.reduce((a,c)=>a+parseR(c.val),0);
+      doc.text(`Total mensal: ${fmtR(totalContr)}`,PW-M-3,y+3,{align:'right'}); y+=8;
+    } else {
+      doc.setTextColor(150,170,200); doc.setFontSize(8);
+      doc.text('Nenhum contrato ativo.',M+3,y); y+=8;
+    }
+
+    // ── 5. ATENDIMENTOS / OS ────────────────────
+    checkPagina(35);
+    secHeader('ATENDIMENTOS (OS)','🔧');
+    if(DB.os.length){
+      DB.os.slice(0,15).forEach((o,i)=>{
+        checkPagina(8);
+        if(i%2===0){doc.setFillColor(248,251,255); doc.rect(M,y-3.5,PW-2*M,6,'F');}
+        doc.setTextColor(40,60,90); doc.setFontSize(8); doc.setFont('helvetica','normal');
+        doc.text(`${o.oid} · ${o.cli}`,M+3,y);
+        doc.setTextColor(90,130,180);
+        doc.text(`${o.tipo||'—'} · Téc: ${o.tec||'—'}`,PW/2,y);
+        const stCor={at:[0,150,100],pr:[200,140,0],em:[21,101,192]}[o.s]||[150,150,150];
+        doc.setTextColor(...stCor); doc.setFont('helvetica','bold');
+        doc.text({at:'Concluída',pr:'Em aberto',em:'Em andamento'}[o.s]||o.s,PW-M-3,y,{align:'right'});
+        y+=6;
+      });
+    } else {
+      doc.setTextColor(150,170,200); doc.setFontSize(8);
+      doc.text('Nenhuma OS registrada.',M+3,y); y+=8;
+    }
+
+    // ── 6. COBRANÇAS ────────────────────────────
+    checkPagina(35);
+    secHeader('COBRANÇAS','💸');
+    const cobsHoje=(DB.cobrancas||[]);
+    if(cobsHoje.length){
+      cobsHoje.slice(0,15).forEach((c,i)=>{
+        checkPagina(8);
+        if(i%2===0){doc.setFillColor(248,251,255); doc.rect(M,y-3.5,PW-2*M,6,'F');}
+        doc.setTextColor(40,60,90); doc.setFontSize(8); doc.setFont('helvetica','normal');
+        doc.text(c.cliente,M+3,y);
+        doc.setTextColor(90,130,180);
+        doc.text(c.descricao||'—',PW/2,y);
+        doc.setFont('helvetica','bold');
+        doc.setTextColor(c.pago?0:200, c.pago?150:50, c.pago?100:50);
+        doc.text(`${fmtR(c.valor)} · ${c.pago?'✓ Pago':'Pendente'}`,PW-M-3,y,{align:'right'});
+        y+=6;
+      });
+    } else {
+      doc.setTextColor(150,170,200); doc.setFontSize(8);
+      doc.text('Nenhuma cobrança registrada.',M+3,y); y+=8;
+    }
+
+    // ── 7. AGENDA DO DIA ────────────────────────
+    checkPagina(25);
+    secHeader('AGENDA DO DIA','📅');
+    const agHoje=[...(DB.agenda?.h||[]),...(DB.agenda?.s||[]).filter(e=>e.data===hojeSimples)];
+    if(agHoje.length){
+      agHoje.forEach((ev,i)=>{
+        checkPagina(8);
+        if(i%2===0){doc.setFillColor(248,251,255); doc.rect(M,y-3.5,PW-2*M,6,'F');}
+        doc.setTextColor(40,60,90); doc.setFontSize(8); doc.setFont('helvetica','normal');
+        doc.text(`${ev.h||'—'} · ${ev.t||ev.titulo||'—'}`,M+3,y);
+        doc.setTextColor(90,130,180);
+        doc.text(`${ev.cli||''}${ev.tec?' · Téc: '+ev.tec:''}`,PW-M-3,y,{align:'right'});
+        y+=6;
+      });
+    } else {
+      doc.setTextColor(150,170,200); doc.setFontSize(8);
+      doc.text('Nenhum evento registrado.',M+3,y); y+=8;
+    }
+
+    // ── 8. TAREFAS ──────────────────────────────
+    checkPagina(25);
+    secHeader('TAREFAS','✅');
+    if(DB.tasks.length){
+      DB.tasks.slice(0,15).forEach((t,i)=>{
+        checkPagina(8);
+        if(i%2===0){doc.setFillColor(248,251,255); doc.rect(M,y-3.5,PW-2*M,6,'F');}
+        doc.setTextColor(40,60,90); doc.setFontSize(8); doc.setFont('helvetica','normal');
+        const txt=(t.txt||'').split('\n')[0].substring(0,60);
+        doc.text(`${t.done?'✓':'○'} ${txt}`,M+3,y);
+        doc.setTextColor(t.done?0:200, t.done?150:80, t.done?100:0);
+        doc.setFont('helvetica','bold');
+        doc.text(t.done?'Concluída':`${t.due||'Sem data'}`,PW-M-3,y,{align:'right'});
+        y+=6;
+      });
+    } else {
+      doc.setTextColor(150,170,200); doc.setFontSize(8);
+      doc.text('Nenhuma tarefa registrada.',M+3,y); y+=8;
+    }
+
+    // ── 9. EQUIPE ───────────────────────────────
+    checkPagina(25);
+    secHeader('EQUIPE TÉCNICA','👷');
+    if(DB.tecnicos.length){
+      DB.tecnicos.forEach((t,i)=>{
+        checkPagina(8);
+        const nome=typeof t==='string'?t:t.nome;
+        const osT=DB.os.filter(o=>(o.tec||'').includes(nome)).length;
+        if(i%2===0){doc.setFillColor(248,251,255); doc.rect(M,y-3.5,PW-2*M,6,'F');}
+        doc.setTextColor(40,60,90); doc.setFontSize(8); doc.setFont('helvetica','normal');
+        doc.text(nome,M+3,y);
+        doc.setTextColor(90,130,180);
+        doc.text(typeof t==='object'&&t.esp?t.esp:'—',PW/2,y);
+        doc.setFont('helvetica','bold'); doc.setTextColor(21,101,192);
+        doc.text(`${osT} OS`,PW-M-3,y,{align:'right'});
+        y+=6;
+      });
+    } else {
+      doc.setTextColor(150,170,200); doc.setFontSize(8);
+      doc.text('Nenhum técnico cadastrado.',M+3,y); y+=8;
+    }
+
+    // ── 10. METAS ───────────────────────────────
+    if(DB.metas?.length){
+      checkPagina(35);
+      secHeader('METAS DO MÊS','🎯');
+      DB.metas.forEach((m,i)=>{
+        checkPagina(10);
+        const atual=calcValorMeta(m);
+        const pct=Math.min(Math.round(atual/(m.alvo||1)*100),100);
+        if(i%2===0){doc.setFillColor(248,251,255); doc.rect(M,y-3.5,PW-2*M,8,'F');}
+        doc.setTextColor(40,60,90); doc.setFontSize(8); doc.setFont('helvetica','normal');
+        doc.text(m.nome,M+3,y);
+        // Barra de progresso
+        const bx=M+80, bw=60;
+        doc.setFillColor(220,235,255); doc.rect(bx,y-3,bw,4,'F');
+        const cor=pct>=100?[0,150,100]:pct>=70?[200,140,0]:[21,101,192];
+        doc.setFillColor(...cor); doc.rect(bx,y-3,bw*pct/100,4,'F');
+        doc.setFont('helvetica','bold'); doc.setTextColor(...cor);
+        doc.text(`${pct}% (${atual}/${m.alvo} ${m.unid||''})`,PW-M-3,y,{align:'right'});
+        y+=8;
+      });
+    }
+
+    // ── RODAPÉ ──────────────────────────────────
+    const totalPags=doc.getNumberOfPages();
+    for(let p=1;p<=totalPags;p++){
+      doc.setPage(p);
+      doc.setFillColor(21,101,192); doc.rect(0,285,PW,12,'F');
+      doc.setTextColor(255,255,255); doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+      doc.text('Grupo Aliança Monitoramento · Segurança Eletrônica',M,292);
+      doc.text(`Página ${p} de ${totalPags} · ${hojeSimples}`,PW-M,292,{align:'right'});
+    }
+
+    const nomeArq=`Relatorio_Diario_${hojeSimples.replace(/\//g,'-')}.pdf`;
+    doc.save(nomeArq);
+    toast(`✅ Relatório gerado: ${nomeArq}`);
+  }catch(e){
+    toast('❌ Erro ao gerar relatório: '+e.message);
+    console.error(e);
+  }
 }
 
 
