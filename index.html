@@ -478,6 +478,9 @@ tr:hover td{background:rgba(255,255,255,.017);}
     <div class="fb" onclick="filtrarTipo(this,'pj')">🏢 PJ</div>
     <div class="fb" onclick="filtrarTipo(this,'pf')">👤 PF</div>
     <div class="fb" onclick="filtrarTipo(this,'lead')">🔥 Com Venda</div>
+    <div class="fb" onclick="filtrarTipo(this,'followup')" style="border-color:rgba(255,69,96,.25);color:var(--red)">⏰ Follow-up</div>
+    <div class="fb" onclick="filtrarTipo(this,'vip')" style="border-color:rgba(245,166,35,.25);color:var(--gold)">⭐ VIP</div>
+    <button class="btn bgh sm adm" onclick="analisarManutencaoIA()" style="color:#3d9bff;border-color:rgba(61,155,255,.3)">🤖 IA — Quem merece manutenção grátis?</button>
     <button class="btn bgh sm" onclick="exportarCSV()" title="Exportar clientes como CSV (compatível com Agendor, Pipedrive, Hubspot...)">📥 Exportar CSV</button>
     <label class="btn bgh sm" style="cursor:pointer" title="Importar clientes de outros CRMs">
       📤 Importar CSV
@@ -3426,8 +3429,26 @@ const MFRM={
   </div>
   <div class="fg"><label>Ponto de Referência</label>
     <input class="fc" id="cli-ref" placeholder="Ex: Próximo ao Shopping Recife"></div>
-  <div class="fg" id="cli-campo-doc2"><label id="cli-lbl-nasc">Data de Nascimento</label>
+  <div class="fg" id="cli-campo-doc2"><label id="cli-lbl-nasc">Data de Nascimento / Fundação</label>
     <input class="fc" id="cli-nasc" type="date"></div>
+  <div class="fg"><label>Segmento / Ramo de Atividade</label>
+    <select class="fc" id="cli-segmento">
+      <option value="">— Selecione —</option>
+      <option>Residencial</option>
+      <option>Condominio Residencial</option>
+      <option>Condominio Comercial</option>
+      <option>Comercio / Loja</option>
+      <option>Empresa / Escritorio</option>
+      <option>Industria / Fabrica</option>
+      <option>Escola / Colegio</option>
+      <option>Clinica / Hospital</option>
+      <option>Igreja / Templo</option>
+      <option>Restaurante / Bar</option>
+      <option>Posto de Combustivel</option>
+      <option>Farmacia</option>
+      <option>Outro</option>
+    </select>
+  </div>
   <div class="fg"><label>Observações</label>
     <textarea class="fc" id="cli-obs" rows="2" placeholder="Anotações, preferências, histórico..."></textarea>
   </div>
@@ -3721,6 +3742,7 @@ const M={
       const num=($('cli-num')?.value||'').trim();
       const ref=($('cli-ref')?.value||'').trim();
       const nasc=($('cli-nasc')?.value||'');
+      const segmento=($('cli-segmento')?.value||'').trim();
       const obs=($('cli-obs')?.value||'').trim();
       const temVenda=$('cli-tem-venda')?.checked||false;
 
@@ -3733,7 +3755,7 @@ const M={
       }
 
       const eid=uid();
-      DB.empresas.push({id:eid,nome,contato:cargo,tel,tel2,email,bairro,cidade,rua,num,ref,s:'pr',val:0,cor:corCli,tag:'mo',tipo,doc,nasc,obs});
+      DB.empresas.push({id:eid,nome,contato:cargo,tel,tel2,email,bairro,cidade,rua,num,ref,s:'pr',val:0,cor:corCli,tag:'mo',tipo,doc,nasc,segmento,obs});
       DB.contatos.push({id:uid(),tipo,nome,doc,cargo,tel,tel2,email,bairro,cidade,rua,num,ref,nasc,obs,emp:tipo==='pj'?nome:'',s:'pr'});
 
       // Adiciona venda se marcou
@@ -4119,6 +4141,8 @@ function rClientes(list){
   if(_cliFilter==='pj')   data=data.filter(e=>e.tipo==='pj'||!e.tipo);
   if(_cliFilter==='pf')   data=data.filter(e=>e.tipo==='pf');
   if(_cliFilter==='lead') data=data.filter(e=>DB.deals.some(d=>d.emp===e.nome));
+  if(_cliFilter==='followup') data=data.filter(e=>calcFollowUp(e).precisa);
+  if(_cliFilter==='vip')  data=data.filter(e=>e.vip||calcScore(e)>=80);
 
   set('nb-clientes',DB.empresas.length);
   set('k-cli',DB.empresas.length);
@@ -4136,17 +4160,20 @@ function rClientes(list){
     const ini=(e.nome||'?')[0].toUpperCase();
     const scoreVal=calcScore(e);
     const scoreCor=scoreVal>=75?'var(--green)':scoreVal>=45?'var(--gold)':'var(--blue)';
+    const fu=calcFollowUp(e);
+    const isVIP=e.vip||scoreVal>=80;
 
-    return `<div onclick="abrirFichaCliente(${e.id})" style="background:var(--s1);border:1px solid var(--bd);border-radius:14px;overflow:hidden;cursor:pointer;transition:transform .15s,border-color .15s,box-shadow .15s" onmouseover="this.style.transform='translateY(-2px)';this.style.borderColor='${cor}';this.style.boxShadow='0 6px 24px rgba(0,0,0,.25)'" onmouseout="this.style.transform='';this.style.borderColor='var(--bd)';this.style.boxShadow=''">
-      <!-- Cabeçalho colorido -->
+    return `<div onclick="abrirFichaCliente(${e.id})" style="background:var(--s1);border:1px solid ${fu.urgente?'rgba(255,69,96,.4)':isVIP?'rgba(245,166,35,.4)':'var(--bd)'};border-radius:14px;overflow:hidden;cursor:pointer;transition:transform .15s,border-color .15s,box-shadow .15s" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 24px rgba(0,0,0,.25)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
       <div style="background:linear-gradient(135deg,${cor}22,${cor}08);border-bottom:1px solid ${cor}33;padding:14px 15px;display:flex;align-items:center;gap:11px">
         <div style="width:46px;height:46px;border-radius:50%;background:${cor};display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#000;flex-shrink:0">${ini}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.nome}</div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <div style="font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.nome}</div>
+            ${isVIP?`<span style="font-size:9px;padding:1px 6px;border-radius:20px;background:rgba(245,166,35,.2);color:var(--gold);font-weight:800">⭐ VIP</span>`:''}
+          </div>
           <div style="display:flex;gap:5px;margin-top:4px;flex-wrap:wrap">
             <span style="font-size:9px;padding:1px 7px;border-radius:20px;background:${isPF?'rgba(176,143,255,.2)':'rgba(245,166,35,.2)'};color:${isPF?'var(--purple)':'var(--gold)'};font-weight:700">${isPF?'👤 PF':'🏢 PJ'}</span>
             ${nConts?`<span style="font-size:9px;padding:1px 7px;border-radius:20px;background:rgba(0,217,126,.15);color:var(--green);font-weight:700">✅ ${nConts} contrato${nConts>1?'s':''}</span>`:''}
-            ${nDeals?`<span style="font-size:9px;padding:1px 7px;border-radius:20px;background:rgba(255,69,96,.12);color:var(--red);font-weight:700">🔥 ${nDeals} venda${nDeals>1?'s':''}</span>`:''}
           </div>
         </div>
         <div style="text-align:right;flex-shrink:0">
@@ -4154,17 +4181,29 @@ function rClientes(list){
           <div style="font-size:8px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">score</div>
         </div>
       </div>
-      <!-- Dados resumidos -->
       <div style="padding:11px 15px;display:flex;flex-direction:column;gap:6px">
-        ${e.tel?`<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2)"><span style="width:16px;text-align:center">📱</span><span>${e.tel}</span></div>`:''}
-        ${e.email?`<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);overflow:hidden"><span style="width:16px;text-align:center">✉️</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.email}</span></div>`:''}
-        ${(e.bairro||e.cidade)?`<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2)"><span style="width:16px;text-align:center">📍</span><span>${[e.bairro,e.cidade].filter(Boolean).join(', ')}</span></div>`:''}
-        ${!e.tel&&!e.email&&!e.bairro?`<div style="font-size:11px;color:var(--t3);font-style:italic">Clique para ver e editar dados</div>`:''}
+        ${e.tel?`<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2)"><span>📱</span><span>${e.tel}</span></div>`:''}
+        ${(e.bairro||e.cidade)?`<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2)"><span>📍</span><span>${[e.bairro,e.cidade].filter(Boolean).join(', ')}</span></div>`:''}
+        <!-- Ultima interacao -->
+        ${fu.ultimaData?`<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t3)">
+          <span>🕐</span><span>Ultima interacao: <strong style="color:var(--t2)">${fu.ultimaData}</strong> (${fu.diasStr})</span>
+        </div>`:''}
+        <!-- Alerta de follow-up -->
+        ${fu.precisa?`<div style="background:${fu.urgente?'rgba(255,69,96,.1)':'rgba(245,166,35,.08)'};border:1px solid ${fu.urgente?'rgba(255,69,96,.3)':'rgba(245,166,35,.25)'};border-radius:7px;padding:6px 8px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <div style="font-size:11px;color:${fu.urgente?'var(--red)':'var(--gold)'};font-weight:700">${fu.msg}</div>
+          ${e.tel?`<a href="https://wa.me/55${e.tel.replace(/\D/g,'')}?text=${encodeURIComponent(fu.msgWA)}" target="_blank" onclick="event.stopPropagation()" style="font-size:10px;padding:3px 8px;background:rgba(0,196,140,.15);border:1px solid rgba(0,196,140,.3);border-radius:6px;color:var(--green);font-weight:700;text-decoration:none;white-space:nowrap">💬 Contatar</a>`:''}
+        </div>`:''}
+        ${isVIP&&fu.ofertarManutencao?`<div style="background:rgba(245,166,35,.08);border:1px solid rgba(245,166,35,.2);border-radius:7px;padding:6px 8px;font-size:11px;color:var(--gold);font-weight:700">
+          ⭐ Cliente VIP — oferecer manutencao gratuita!
+        </div>`:''}
       </div>
-      <!-- Footer com stats -->
-      <div style="padding:8px 15px;background:var(--s2);border-top:1px solid var(--bd);display:flex;gap:12px">
+      <div style="padding:8px 15px;background:var(--s2);border-top:1px solid var(--bd);display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         ${[{ic:'🔧',v:nOS,l:'OS'},{ic:'📄',v:nConts,l:'Contratos'},{ic:'🔀',v:nDeals,l:'Vendas'}].map(s=>`<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:${s.v>0?'var(--t1)':'var(--t3)'}"><span>${s.ic}</span><strong>${s.v}</strong><span style="color:var(--t3)">${s.l}</span></div>`).join('')}
-        <div style="margin-left:auto;font-size:10px;color:var(--t3)">👆 ver tudo</div>
+        ${e.segmento?`<span style="font-size:9px;color:var(--t3)">${e.segmento}</span>`:''}
+        <div style="margin-left:auto;display:flex;gap:5px;align-items:center">
+          ${e.tel?`<button onclick="event.stopPropagation();enviarDicaPersonalizada(${e.id})" title="Enviar dica personalizada" style="font-size:10px;padding:3px 7px;background:rgba(61,155,255,.1);border:1px solid rgba(61,155,255,.2);border-radius:6px;color:#3d9bff;cursor:pointer;font-family:var(--F)">💡 Dica</button>`:''}
+          ${aniversarioHoje(e)?`<span style="font-size:10px;padding:2px 7px;background:rgba(245,166,35,.15);border:1px solid rgba(245,166,35,.3);border-radius:10px;color:var(--gold);font-weight:700">🎂 Hoje!</span>`:''}
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -8195,6 +8234,15 @@ function coletarVencimentosDia(){
     }
   });
 
+  // Follow-up de clientes (5 dias úteis e 30 dias)
+  DB.empresas.filter(e=>e.tel).forEach(e=>{
+    const fu=calcFollowUp(e);
+    if(fu.precisa&&fu.urgente)
+      itens.push({ic:'⏰',titulo:`Follow-up: ${e.nome}`,sub:fu.msg,tipo:'followup',urgente:true,obj:e});
+    else if(fu.precisa&&fu.ofertarManutencao)
+      itens.push({ic:'⭐',titulo:`VIP: ${e.nome}`,sub:fu.msg,tipo:'followup',urgente:false,obj:e});
+  });
+
   return itens;
 }
 
@@ -8773,6 +8821,390 @@ ${DB.metas?.length?`
 }
 
 
+// ── Dias Uteis (pula sábado e domingo) ──────────
+function diasUteis(dataInicio, dataFim){
+  let d=new Date(dataInicio); d.setHours(0,0,0,0);
+  const fim=new Date(dataFim); fim.setHours(0,0,0,0);
+  let count=0;
+  while(d<fim){
+    d.setDate(d.getDate()+1);
+    const ds=d.getDay();
+    if(ds!==0&&ds!==6) count++;
+  }
+  return count;
+}
+
+// ── Calcula follow-up do cliente ─────────────────
+function calcFollowUp(e){
+  const hoje=new Date(); hoje.setHours(0,0,0,0);
+  const nome=e.nome;
+  let ultimaTs=0, ultimaData='', ultimaDesc='';
+
+  // Última OS concluída
+  DB.os.filter(o=>o.cli===nome&&o.s==='at').forEach(o=>{
+    const ts=o.id||0;
+    if(ts>ultimaTs){ultimaTs=ts;ultimaData=o.data||'';ultimaDesc='OS: '+o.tipo;}
+  });
+  // Última OS em geral
+  DB.os.filter(o=>o.cli===nome).forEach(o=>{
+    const ts=o.id||0;
+    if(ts>ultimaTs){ultimaTs=ts;ultimaData=o.data||'';ultimaDesc='Atendimento';}
+  });
+  // Contrato mais recente
+  DB.contratos.filter(c=>c.cli===nome).forEach(c=>{
+    const ts=c.id||0;
+    if(ts>ultimaTs){ultimaTs=ts;ultimaData=c.ini||'';ultimaDesc='Contrato: '+c.srv;}
+  });
+  // Compras anteriores
+  (DB.comprasClientes?.[nome]||[]).forEach(c=>{
+    if(c.ts>ultimaTs){ultimaTs=c.ts;ultimaData=c.data||'';ultimaDesc='Compra: '+c.produto;}
+  });
+
+  if(!ultimaTs) return {precisa:false,ultimaData:'',diasStr:'',msg:'',msgWA:'',urgente:false,ofertarManutencao:false};
+
+  // Calcula dias corridos
+  const dtUlt=new Date(ultimaTs);
+  const diasCorr=Math.floor((hoje-dtUlt)/(1000*60*60*24));
+  const du=diasUteis(dtUlt,hoje);
+  const diasStr=diasCorr===0?'hoje':diasCorr===1?'ontem':`${diasCorr} dias atras`;
+
+  // Regras de follow-up
+  let msg='', msgWA='', precisa=false, urgente=false, ofertarManutencao=false;
+  const isVIP=e.vip||calcScore(e)>=80;
+
+  if(du>=5&&du<10&&!e.followup5){
+    precisa=true; urgente=false;
+    msg=`⏰ ${du} dias uteis — perguntar se esta tudo bem`;
+    msgWA=`Ola ${nome}! 😊\n\nPassando para saber se o servico que realizamos para voce esta tudo certo!\n\nQualquer duvida estamos a disposicao.\n\n*Grupo Alianca Monitoramento* 🛡️`;
+  }
+  if(du>=10&&diasCorr<30){
+    precisa=true; urgente=du>=15;
+    msg=`${du>=15?'🚨':'⚠️'} ${du} dias uteis sem contato`;
+    msgWA=`Ola ${nome}! 😊\n\nFaz um tempo que nao conversamos! Gostariamos de saber se voce precisa de algo ou se tem alguma duvida sobre nossos servicos.\n\nEstamos sempre aqui!\n\n*Grupo Alianca Monitoramento* 🛡️`;
+  }
+  if(diasCorr>=30){
+    precisa=true; urgente=false;
+    ofertarManutencao=isVIP;
+    msg=isVIP?`⭐ 30+ dias — oferecer manutencao gratis (VIP)`:`📅 ${diasCorr} dias — verificar necessidades`;
+    msgWA=isVIP
+      ?`Ola ${nome}! 😊\n\nComo nosso cliente especial, gostaríamos de oferecer uma *manutencao preventiva gratuita* para garantir que seu sistema de seguranca esta funcionando perfeitamente!\n\nQual seria o melhor horario para agendarmos?\n\n*Grupo Alianca Monitoramento* 🛡️`
+      :`Ola ${nome}! 😊\n\nJa faz um mes e gostaríamos de saber se esta precisando de algum servico ou se tem algo que possamos melhorar para voce!\n\n*Grupo Alianca Monitoramento* 🛡️`;
+  }
+
+  return {precisa,ultimaData,ultimaDesc,diasStr,diasCorr,msg,msgWA,urgente,ofertarManutencao};
+}
+
+// ═══════════════════════════════════════════════════
+//  🎂 ANIVERSÁRIOS + DICAS PERSONALIZADAS POR SEGMENTO
+// ═══════════════════════════════════════════════════
+
+const DICAS_SEGMENTO = {
+  'Residencial': [
+    'Lembrete: verifique se as cameras estao gravando corretamente a noite!',
+    'Dica: mantenha o acesso remoto ativo para monitorar sua casa de qualquer lugar.',
+    'Sabia que sensores de movimento externos reduzem tentativas de invasao em 60%?',
+  ],
+  'Condominio Residencial': [
+    'Dica para condominios: cameras na entrada reduzem incidentes em ate 70%.',
+    'Controle de acesso por biometria e a tendencia numero 1 em condominios em 2026.',
+    'Lembrete: revisao anual do sistema previne falhas e garante a seguranca dos moradores.',
+  ],
+  'Comercio / Loja': [
+    'Sabia que 80% dos furtos em comercios acontecem por funcionarios? Cameras internas previnem.',
+    'Dica: alarme com monitoramento 24h reduz o valor do seguro comercial em ate 30%.',
+    'Cameras com analitico de contagem de pessoas ajudam a entender o fluxo da sua loja.',
+  ],
+  'Empresa / Escritorio': [
+    'Dica: controle de acesso por cartao ou biometria protege areas sensiveis do escritorio.',
+    'Cameras IP com armazenamento em nuvem garantem imagens mesmo se o equipamento for roubado.',
+    'Monitoramento remoto permite que voce veja seu escritorio de qualquer lugar do mundo.',
+  ],
+  'Industria / Fabrica': [
+    'Dica: cameras termicas detectam problemas eletricos antes que virem incendios.',
+    'Controle de acesso em areas de producao reduz acidentes e furtos de insumos.',
+    'Rastreamento de veiculos de frota reduz custos com combustivel em ate 20%.',
+  ],
+  'Escola / Colegio': [
+    'Dica: cameras na entrada e saida garantem a seguranca dos alunos e tranquilidade dos pais.',
+    'Sistema de controle de acesso impede a entrada de pessoas nao autorizadas.',
+    'Interfone com video na portaria e essencial para a seguranca escolar.',
+  ],
+  'Clinica / Hospital': [
+    'Dica: cameras em areas de espera reduzem conflitos e protegem pacientes e funcionarios.',
+    'Controle de acesso em areas restritas (UTI, medicamentos) e obrigatorio em muitas normas.',
+    'Monitoramento 24h em clinicas reduz furtos de equipamentos medicos.',
+  ],
+  'Restaurante / Bar': [
+    'Dica: cameras no caixa e cozinha reduzem perdas internas em restaurantes.',
+    'Alarme monitorado protege seu estabelecimento fora do horario de funcionamento.',
+    'Cameras externas com iluminacao IR garantem seguranca no estacionamento.',
+  ],
+};
+
+function dicaParaSegmento(segmento){
+  const dicas=DICAS_SEGMENTO[segmento]||[
+    'Revisao periodica do seu sistema garante que tudo funciona perfeitamente.',
+    'Lembrete: baterias de backup dos alarmes devem ser trocadas a cada 2 anos.',
+    'Manutencao preventiva evita falhas nos momentos mais criticos.',
+  ];
+  return dicas[Math.floor(Date.now()/86400000)%dicas.length];
+}
+
+function verificarAniversarios(){
+  const hoje=new Date();
+  const dd=hoje.getDate(), mm=hoje.getMonth()+1;
+  const aniversariantes=[];
+  DB.empresas.forEach(e=>{
+    if(!e.nasc) return;
+    const d=parseDateLocal(e.nasc);
+    if(!d) return;
+    if(d.getDate()===dd && d.getMonth()+1===mm){
+      aniversariantes.push(e);
+      DB.notifs.unshift({ic:'🎂',t:`Aniversario: ${e.nome}`,sub:`Hoje e o aniversario de ${e.nome}!`,time:nowStr(),tipo:'unread'});
+    }
+  });
+  if(aniversariantes.length){ rNotifs(); mostrarAniversariantes(aniversariantes); }
+}
+
+function aniversarioHoje(e){
+  if(!e.nasc) return false;
+  const hoje=new Date();
+  const d=parseDateLocal(e.nasc);
+  if(!d) return false;
+  return d.getDate()===hoje.getDate()&&d.getMonth()===hoje.getMonth();
+}
+
+
+  const hoje=new Date();
+  const dd=hoje.getDate(), mm=hoje.getMonth()+1;
+  const aniversariantes=[];
+
+  DB.empresas.forEach(e=>{
+    if(!e.nasc) return;
+    const d=parseDateLocal(e.nasc);
+    if(!d) return;
+    if(d.getDate()===dd && d.getMonth()+1===mm){
+      aniversariantes.push(e);
+      // Notifica no CRM
+      DB.notifs.unshift({
+        ic:'🎂',
+        t:`Aniversario: ${e.nome}`,
+        sub:`Hoje e o ${e.tipo==='pf'?'aniversario':'aniversario de fundacao'} de ${e.nome}!`,
+        time:nowStr(),
+        tipo:'unread'
+      });
+    }
+  });
+
+  if(aniversariantes.length){
+    rNotifs();
+    // Mostra modal de parabens
+    mostrarAniversariantes(aniversariantes);
+  }
+
+function mostrarAniversariantes(lista){
+  $('mod-title').innerHTML='🎂 Aniversario(s) Hoje!';
+  $('mod-body').innerHTML=`
+    <div style="text-align:center;margin-bottom:16px">
+      <div style="font-size:40px;margin-bottom:6px">🎉</div>
+      <div style="font-size:13px;color:var(--t2)">Esses clientes merecem uma mensagem especial hoje!</div>
+    </div>
+    ${lista.map(e=>{
+      const isPF=e.tipo==='pf';
+      const msg=isPF
+        ?`Ola ${e.nome}! 🎂🎉\n\nA equipe da Grupo Alianca Monitoramento deseja a voce um FELIZ ANIVERSARIO! \n\nQue este novo ano seja repleto de saude, alegria e muita seguranca! 🛡️\n\nConte sempre com a gente!\n\n*Grupo Alianca Monitoramento* 🛡️`
+        :`Parabens, ${e.nome}! 🎊\n\nA equipe da Grupo Alianca Monitoramento deseja um FELIZ ANIVERSARIO DE FUNDACAO para toda a equipe!\n\nQue este novo ano traga muito sucesso e crescimento! 🚀\n\nConte sempre com a nossa parceria!\n\n*Grupo Alianca Monitoramento* 🛡️`;
+      return `<div style="background:var(--s2);border-radius:10px;padding:14px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <div style="width:40px;height:40px;border-radius:50%;background:${e.cor||'#f5a623'};display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#000">${(e.nome||'?')[0]}</div>
+          <div>
+            <div style="font-size:13px;font-weight:700">${e.nome}</div>
+            <div style="font-size:11px;color:var(--t3)">${isPF?'🎂 Aniversario pessoal':'🏢 Aniversario de fundacao'}</div>
+          </div>
+        </div>
+        ${e.tel?`<a href="https://wa.me/55${e.tel.replace(/\D/g,'')}?text=${encodeURIComponent(msg)}" target="_blank"
+          style="display:flex;align-items:center;justify-content:center;gap:8px;padding:9px;background:rgba(0,196,140,.1);border:1px solid rgba(0,196,140,.25);border-radius:8px;color:var(--green);font-size:12px;font-weight:700;text-decoration:none">
+          💬 Enviar Parabens no WhatsApp
+        </a>`:`<div style="font-size:11px;color:var(--t3);text-align:center">Sem telefone cadastrado</div>`}
+      </div>`;
+    }).join('')}`;
+  const btn=$('mod-save-btn');
+  if(btn){btn.style.display='';btn.textContent='Fechar';btn.onclick=()=>{btn.textContent='Salvar';btn.onclick=()=>M.save();M.close();};}
+  $('MOD').classList.add('open');
+}
+
+async function enviarDicaPersonalizada(clienteId){
+  const e=DB.empresas.find(x=>x.id===clienteId);
+  if(!e||!e.tel){toast('⚠️ Cliente sem telefone cadastrado!');return;}
+  if(!_apiKey){
+    // Usa dica pre-programada
+    const dica=dicaParaSegmento(e.segmento||'');
+    const msg=`Ola ${e.nome}! 👋\n\n💡 *Dica de Seguranca da Alianca:*\n\n${dica}\n\nQualquer duvida ou necessidade, estamos a disposicao!\n\n*Grupo Alianca Monitoramento* 🛡️`;
+    window.open(`https://wa.me/55${e.tel.replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`,'_blank');
+    return;
+  }
+
+  toast('🤖 IA gerando dica personalizada...');
+  const contratos=DB.contratos.filter(c=>c.cli===e.nome&&c.s==='at');
+  const compras=(DB.comprasClientes?.[e.nome]||[]).map(c=>c.produto).join(', ');
+  const os=DB.os.filter(o=>o.cli===e.nome);
+
+  const prompt=`Voce e um consultor de seguranca eletronica da empresa "Grupo Alianca Monitoramento".
+Crie UMA mensagem de WhatsApp curta e personalizada para o cliente abaixo com uma dica ou informacao util de seguranca para o segmento dele.
+
+CLIENTE:
+- Nome: ${e.nome}
+- Segmento: ${e.segmento||'nao informado'}
+- Servicos contratados: ${contratos.map(c=>c.srv).join(', ')||'nenhum'}
+- Equipamentos: ${compras||'nenhum registrado'}
+- OS realizadas: ${os.length}
+- Observacoes: ${e.obs||'nenhuma'}
+
+REGRAS:
+- Mensagem curta (maximo 5 linhas)
+- Comece com "Ola ${e.nome}!"
+- Use emoji moderadamente
+- Seja util e nao seja vendedor demais
+- Termine com "Grupo Alianca Monitoramento 🛡️"
+- Escreva em portugues informal mas profissional`;
+
+  try{
+    const dica=await chamarClaude(prompt, 200, 'Voce escreve mensagens WhatsApp profissionais e uteis para clientes de seguranca eletronica.');
+    window.open(`https://wa.me/55${e.tel.replace(/\D/g,'')}?text=${encodeURIComponent(dica)}`,'_blank');
+    toast('✅ Dica personalizada aberta no WhatsApp!');
+  }catch(err){
+    const dica=dicaParaSegmento(e.segmento||'');
+    const msg=`Ola ${e.nome}! 👋\n\n💡 *Dica de Seguranca:*\n\n${dica}\n\n*Grupo Alianca Monitoramento* 🛡️`;
+    window.open(`https://wa.me/55${e.tel.replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`,'_blank');
+  }
+}
+
+
+async function analisarManutencaoIA(){
+  if(!_apiKey){
+    toast('⚠️ Configure sua chave de IA em ⚙️ Configurações → Inteligência IA');
+    go('config'); return;
+  }
+
+  // Abre modal com loading
+  $('mod-title').innerHTML='🤖 Analisando clientes para Manutenção Gratuita...';
+  $('mod-body').innerHTML=`<div style="text-align:center;padding:28px">
+    <div style="font-size:36px;margin-bottom:12px">🤖</div>
+    <div style="font-size:14px;color:var(--t1);font-weight:700">Estudando todos os seus clientes...</div>
+    <div style="font-size:12px;color:var(--t2);margin-top:8px">Analisando contratos, historico, OS, fidelidade e valor</div>
+    <div style="margin-top:16px;height:4px;background:var(--s2);border-radius:20px;overflow:hidden">
+      <div id="ia-prog" style="height:100%;background:#3d9bff;border-radius:20px;width:0%;transition:width 2s ease"></div>
+    </div>
+  </div>`;
+  const btn=$('mod-save-btn');
+  if(btn){btn.textContent='Fechar';btn.onclick=()=>{btn.textContent='Salvar';btn.onclick=()=>M.save();M.close();};}
+  $('MOD').classList.add('open');
+  setTimeout(()=>{const p=$('ia-prog');if(p)p.style.width='80%';},200);
+
+  // Monta perfil de cada cliente com dados reais
+  const clientes=DB.empresas.map(e=>{
+    const contratos=DB.contratos.filter(c=>c.cli===e.nome&&c.s==='at');
+    const os=DB.os.filter(o=>o.cli===e.nome);
+    const osConc=os.filter(o=>o.s==='at').length;
+    const compras=(DB.comprasClientes?.[e.nome]||[]);
+    const deals=DB.deals.filter(d=>d.emp===e.nome);
+    const dealsFech=deals.filter(d=>d.stage===DB.stages.length-1&&!d.cancelado);
+    const receitaTotal=contratos.reduce((a,c)=>a+parseR(c.val),0)*12
+      +dealsFech.reduce((a,d)=>a+parseR(d.val),0);
+    const fu=calcFollowUp(e);
+    const score=calcScore(e);
+
+    return {
+      nome:e.nome,
+      tipo:e.tipo==='pf'?'Pessoa Fisica':'Empresa',
+      contratos:contratos.map(c=>`${c.srv} R$${c.val}/mes`).join(', ')||'Nenhum',
+      osTotal:os.length,
+      osConc,
+      compras:compras.map(c=>c.produto).join(', ')||'Nenhuma',
+      dealsFechados:dealsFech.length,
+      receitaAnualEstimada:receitaTotal,
+      score,
+      diasSemContato:fu.diasCorr||0,
+      isVIP:e.vip||score>=80,
+      observacoes:e.obs||''
+    };
+  });
+
+  if(!clientes.length){
+    $('mod-body').innerHTML=`<div style="text-align:center;padding:20px;color:var(--t3)">Nenhum cliente cadastrado ainda.</div>`;
+    return;
+  }
+
+  const r=calcReceita();
+  const prompt=`Voce e um consultor especialista em fidelizacao de clientes para empresas de seguranca eletronica.
+
+Analise a lista de clientes abaixo da empresa "Grupo Alianca Monitoramento" e indique:
+1. Quais clientes MERECEM uma manutencao preventiva GRATUITA (considere fidelidade, receita gerada, tempo sem contato, relacionamento)
+2. Para cada recomendado explique BREVEMENTE o motivo (1 linha)
+3. Uma ORDEM DE PRIORIDADE (quem deve receber primeiro)
+4. Clientes que NAO devem receber agora e por que (1 linha cada)
+
+DADOS DA EMPRESA:
+- Receita total: ${fmtR(r.recTotal)}
+- Total de clientes: ${clientes.length}
+
+CLIENTES:
+${clientes.map((c,i)=>`${i+1}. ${c.nome} (${c.tipo})
+   - Contratos: ${c.contratos}
+   - OS realizadas: ${c.osTotal} (${c.osConc} concluidas)
+   - Compras anteriores: ${c.compras}
+   - Vendas fechadas: ${c.dealsFechados}
+   - Receita anual estimada: ${fmtR(c.receitaAnualEstimada)}
+   - Score CRM: ${c.score}/100
+   - Dias sem contato: ${c.diasSemContato}
+   - VIP: ${c.isVIP?'Sim':'Nao'}
+   ${c.observacoes?'- Obs: '+c.observacoes:''}`).join('\n\n')}
+
+Responda de forma clara e organizada em portugues. Seja objetivo e direto.`;
+
+  try{
+    const analise=await chamarClaude(prompt, 1000,
+      'Voce e especialista em fidelizacao de clientes de empresas de seguranca eletronica no Brasil. Analise os dados e seja direto e pratico nas recomendacoes.');
+
+    const prog=$('ia-prog');if(prog)prog.style.width='100%';
+
+    $('mod-title').innerHTML='🤖 IA — Recomendações de Manutenção Gratuita';
+    $('mod-body').innerHTML=`
+      <div style="background:rgba(61,155,255,.07);border:1px solid rgba(61,155,255,.2);border-radius:10px;padding:12px;margin-bottom:14px;display:flex;gap:12px;align-items:flex-start">
+        <div style="font-size:24px">🤖</div>
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#3d9bff;margin-bottom:4px">Análise baseada em ${clientes.length} clientes</div>
+          <div style="font-size:11px;color:var(--t3)">Contratos · OS · Historico · Score · Fidelidade · Receita gerada</div>
+        </div>
+      </div>
+      <div style="font-size:13px;line-height:1.85;color:var(--t1);white-space:pre-wrap">${analise}</div>
+      <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+        <button onclick="window.open('https://wa.me/?text='+encodeURIComponent('Relatorio de manutencao gratuita gerado pelo CRM:\\n\\n${analise.substring(0,200)}...'),'_blank')"
+          style="flex:1;padding:9px;background:rgba(0,196,140,.1);border:1px solid rgba(0,196,140,.25);border-radius:8px;color:var(--green);font-size:11px;font-weight:700;cursor:pointer">
+          💬 Compartilhar no WhatsApp
+        </button>
+        <button onclick="navigator.clipboard?.writeText('${analise.replace(/'/g,"\\'")}');toast('✅ Copiado!')"
+          style="flex:1;padding:9px;background:var(--s2);border:1px solid var(--bd);border-radius:8px;color:var(--t2);font-size:11px;font-weight:700;cursor:pointer">
+          📋 Copiar Análise
+        </button>
+      </div>
+      <div style="margin-top:8px;font-size:10px;color:var(--t3);text-align:center">🤖 Gerado por Claude AI · ${new Date().toLocaleString('pt-BR')}</div>`;
+  }catch(e){
+    $('mod-body').innerHTML=`<div style="text-align:center;color:var(--red);padding:20px">
+      <div style="font-size:24px">❌</div>
+      <div style="margin-top:8px;font-size:13px;font-weight:700">Erro na IA</div>
+      <div style="font-size:12px;color:var(--t2);margin-top:4px">${e.message}</div>
+      <div style="font-size:11px;color:var(--t3);margin-top:8px">Verifique sua chave em ⚙️ Configurações</div>
+    </div>`;
+  }
+}
+
+function marcarFollowUpFeito(clienteId){
+  const e=DB.empresas.find(x=>x.id===clienteId);
+  if(e){ e.followup5=Date.now(); autoSave(); rClientes(); toast('✅ Follow-up registrado!'); }
+}
+
+
 function popularHistoricoSel(){
   const sel=$('hist-cliente-sel'); if(!sel) return;
   sel.innerHTML='<option value="">— Selecione um cliente —</option>'
@@ -8838,7 +9270,7 @@ function initApp(){
   setTimeout(()=>{ iniciarSyncJB(); atualizarStatusJB(); }, 1500);
 
   // Verificação diária de vencimentos
-  setTimeout(()=>verificarVencimentosDia(), 3000);
+  setTimeout(()=>{ verificarVencimentosDia(); verificarAniversarios(); }, 3000);
   // Verifica a cada hora
   setInterval(()=>verificarVencimentosDia(), 60*60*1000);
 
