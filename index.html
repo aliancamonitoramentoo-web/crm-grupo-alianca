@@ -578,7 +578,7 @@ tr:hover td{background:rgba(255,255,255,.017);}
 <div class="pg" id="pg-financeiro">
   <div class="g4">
     <div class="kpi kgr"><div class="kl">Receita/mês (contratos ativos)</div><div class="kv" id="fin-r">R$ 0</div><div class="kd up">baseado em contratos reais</div></div>
-    <div class="kpi kr"><div class="kl">Despesas Lançadas</div><div class="kv" id="fin-d">R$ 0</div><div class="kd">—</div></div>
+    <div class="kpi kr"><div class="kl">Despesas Reais</div><div class="kv" id="fin-d">R$ 0</div><div class="kd" id="fin-d-sub">sem estornos</div></div>
     <div class="kpi kg"><div class="kl">Saldo Estimado</div><div class="kv" id="fin-s">R$ 0</div><div class="kd" id="fin-sd">—</div></div>
     <div class="kpi kb"><div class="kl">Contratos Ativos</div><div class="kv" id="fin-c">0</div><div class="kd">—</div></div>
   </div>
@@ -1564,6 +1564,7 @@ function updKPI(){
   set('fin-r', fmtR(r.recTotal));
   set('fin-c', r.nContratos);
   set('fin-d', fmtR(r.saidas));
+  set('fin-d-sub', r.estornos>0?`🚫 ${fmtR(r.estornos)} em estornos`:'sem estornos');
   set('fin-s', fmtR(r.saldo));
   set('fin-sd', r.saldo>=0?'↑ positivo':'↓ negativo');
 
@@ -8789,6 +8790,16 @@ function initApp(){
   if(!DB.metas)       DB.metas=[];
   if(!DB.cobrancas)       DB.cobrancas=[];
   if(!DB.comprasClientes) DB.comprasClientes={};
+
+  // Migra estornos antigos que foram salvos como tipo:'out' com Estorno no desc
+  let migrou=false;
+  DB.movs.forEach(m=>{
+    if(m.tipo==='out' && m.desc && m.desc.includes('Estorno')){
+      m.tipo='estorno';
+      migrou=true;
+    }
+  });
+  if(migrou){ salvarLocal(); jbEnviar(false); }
   if(!DB.historico)   DB.historico={};
   if(!DB.autoMsg)   DB.autoMsg={ativo:true,wa:true,email:true,msgWA:`Olá {nome}! 🎉\n\nSua execução foi aprovada! Em breve entraremos em contato para agendar.\n\nAtenciosamente,\nAliance CRM 🛡️`,msgEmail:`Prezado(a) {nome},\n\nConfirmamos a aprovação do seu contrato!\n\nNosso técnico entrará em contato em breve.\n\nAtenciosamente,\nAliance CRM`,assuntoEmail:'🏆 Bem-vindo ao Aliance CRM!'};
   if(!DB.adminCfg)  DB.adminCfg={osTipos:['Atendimento','Visita','Execução','Entrega','Suporte','Consultoria'],servicos:[{key:'sv',label:'🔧 Serviço',cor:'#0057FF'},{key:'pr',label:'📦 Produto',cor:'#8b5cf6'},{key:'co',label:'📋 Consultoria',cor:'#f59e0b'},{key:'mn',label:'🔄 Manutenção',cor:'#00C48C'},{key:'ou',label:'⭐ Outro',cor:'#ef4444'}],status:[{key:'at',label:'Ativo',cor:'#00d97e'},{key:'pr',label:'Proposta',cor:'#f5a623'},{key:'ng',label:'Negociação',cor:'#ff8c42'},{key:'pd',label:'Atraso',cor:'#ff4560'},{key:'vt',label:'Em andamento',cor:'#3d9bff'}],segmentos:['Condomínio','Comércio','Indústria','Saúde','Educação','Financeiro','Residencial','Outro'],camposExtras:[]};
