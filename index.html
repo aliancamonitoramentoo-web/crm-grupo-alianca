@@ -1674,16 +1674,17 @@ function rPipeline(){
     const tot=deals.reduce((a,d)=>a+parseR(d.val),0);
     const cancelados=DB.deals.filter(d=>d.stage===si&&d.cancelado);
 
-    // Coluna Fechado — só valor total
+    // Coluna Fechado — limpa, só total + botão Gerenciar
     if(isFechado){
       return `<div class="stg">
         <div class="sth"><span class="stn" style="color:${sg.c}">${sg.n}</span><span class="stc">${deals.length}</span></div>
         <div class="stb" style="background:${sg.c}"></div>
-        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 12px;gap:6px">
-          <div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.8px">Total Fechado</div>
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 12px;gap:5px">
+          <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.8px">Total Fechado</div>
           <div style="font-size:28px;font-weight:900;color:var(--green)">${fmtR(Math.round(tot))}</div>
           <div style="font-size:12px;color:var(--t3)">${deals.length} venda(s)</div>
-          ${cancelados.length?`<div style="font-size:10px;color:#ef4444;margin-top:4px">🚫 ${cancelados.length} cancelado(s)</div>`:''}
+          ${cancelados.length?`<div style="font-size:10px;color:#ef4444;margin-top:2px">🚫 ${cancelados.length} cancelado(s)</div>`:''}
+          <button onclick="gerenciarVendasFechadas()" style="margin-top:10px;font-size:11px;padding:5px 16px;color:var(--t2);background:var(--s2);border:1px solid var(--bd);border-radius:20px;cursor:pointer">⚙️ Gerenciar</button>
         </div>
       </div>`;
     }
@@ -1719,6 +1720,28 @@ function rPipeline(){
     return `<div class="kpi" style="border-top:3px solid ${sg.c}"><div class="kl">${sg.n}</div><div class="kv" style="font-size:18px">${fmtR(t)}</div><div class="kd neu">${d.length} negócios</div></div>`;
   }).join('');
 }
+
+function gerenciarVendasFechadas(){
+  if(!isAdmin()){toast('⛔ Apenas administradores podem gerenciar vendas!');return;}
+  const deals=DB.deals.filter(d=>d.stage===DB.stages.length-1&&!d.cancelado);
+  $('mod-title').innerHTML='⚙️ Gerenciar Vendas Fechadas';
+  $('mod-body').innerHTML=deals.length?`
+    <div style="font-size:12px;color:var(--t2);margin-bottom:12px">Clique em "Cancelar" para registrar cancelamento com motivo no histórico.</div>
+    <div style="display:flex;flex-direction:column;gap:0">
+    ${deals.map(d=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--bd)">
+        <div>
+          <div style="font-size:13px;font-weight:700">${d.emp}</div>
+          <div style="font-size:11px;color:var(--t2)">${fmtR(d.val)} · ${TAGL[d.tag]||d.tag||'—'}</div>
+        </div>
+        <button onclick="cancelarVenda(${d.id})" style="font-size:11px;padding:4px 12px;color:#ef4444;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:20px;cursor:pointer">Cancelar</button>
+      </div>`).join('')}
+    </div>`
+  :`<div style="text-align:center;padding:24px;color:var(--t3)">Nenhuma venda fechada ainda.</div>`;
+  const btn=$('mod-save-btn');if(btn){btn.textContent='Fechar';btn.onclick=()=>{btn.textContent='Salvar';btn.onclick=()=>M.save();M.close();};}
+  $('MOD').classList.add('open');
+}
+
 function moverParaFunil(id){
   const d=DB.deals.find(x=>x.id===id); if(!d) return;
   d.stage=DB.stages.length-2;
