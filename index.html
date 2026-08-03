@@ -4249,21 +4249,23 @@ function abrirFichaCliente(id){
 
     <!-- Dados editáveis -->
     <div style="background:var(--s2);border-radius:11px;padding:13px">
-      <div style="font-size:10px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">📝 Dados do Cliente ${adm?'<span style="color:var(--t3);font-weight:400;font-size:9px">(clique para editar)</span>':''}
+      <div style="font-size:10px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">📝 Dados do Cliente
+        ${adm?'<span style="color:var(--t3);font-weight:400;font-size:9px">(edite os campos e clique em Salvar)</span>':''}
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
-        ${campoFicha('Nome',e.nome,adm,'editEmp('+e.id+',"nome",this.value)','text','grid-column:1/-1')}
-        ${campoFicha(isPF?'CPF':'CNPJ',e.doc||'',adm,'editEmp('+e.id+',"doc",this.value)','text')}
-        ${campoFicha(isPF?'Profissão':'Cargo',e.contato||'',adm,'editEmp('+e.id+',"contato",this.value)','text')}
-        ${campoFicha('WhatsApp',e.tel||'',adm,'editEmp('+e.id+',"tel",this.value)','tel')}
-        ${campoFicha('Telefone Fixo',e.tel2||'',adm,'editEmp('+e.id+',"tel2",this.value)','tel')}
-        ${campoFicha('E-mail',e.email||'',adm,'editEmp('+e.id+',"email",this.value)','email','grid-column:1/-1')}
-        ${campoFicha('Rua/Logradouro',e.rua||'',adm,'editEmp('+e.id+',"rua",this.value)','text')}
-        ${campoFicha('Número',e.num||'',adm,'editEmp('+e.id+',"num",this.value)','text')}
-        ${campoFicha('Bairro',e.bairro||'',adm,'editEmp('+e.id+',"bairro",this.value)','text')}
-        ${campoFicha('Cidade',e.cidade||'',adm,'editEmp('+e.id+',"cidade",this.value)','text')}
-        ${campoFicha('Ponto de Referência',e.ref||'',adm,'editEmp('+e.id+',"ref",this.value)','text','grid-column:1/-1')}
-        ${campoFicha('Observações',e.obs||'',adm,'editEmp('+e.id+',"obs",this.value)','text','grid-column:1/-1')}
+        ${campoFicha('Nome',e.nome,adm,'','text','grid-column:1/-1','fc-nome')}
+        ${campoFicha(isPF?'CPF':'CNPJ',e.doc||'',adm,'','text','','fc-doc')}
+        ${campoFicha(isPF?'Profissão':'Cargo',e.contato||'',adm,'','text','','fc-cargo')}
+        ${campoFicha('WhatsApp',e.tel||'',adm,'','tel','','fc-tel')}
+        ${campoFicha('Telefone Fixo',e.tel2||'',adm,'','tel','','fc-tel2')}
+        ${campoFicha('E-mail',e.email||'',adm,'','email','grid-column:1/-1','fc-email')}
+        ${campoFicha('Rua/Logradouro',e.rua||'',adm,'','text','','fc-rua')}
+        ${campoFicha('Número',e.num||'',adm,'','text','','fc-num')}
+        ${campoFicha('Bairro',e.bairro||'',adm,'','text','','fc-bairro')}
+        ${campoFicha('Cidade',e.cidade||'',adm,'','text','','fc-cidade')}
+        ${campoFicha('Ponto de Referência',e.ref||'',adm,'','text','grid-column:1/-1','fc-ref')}
+        ${campoFicha('Observações',e.obs||'',adm,'','text','grid-column:1/-1','fc-obs')}
+        ${campoFicha('Data Nasc./Fundação',e.nasc||'',adm,'','date','','fc-nasc')}
         <!-- Segmentos -->
         <div style="grid-column:1/-1">
           <div style="font-size:10px;color:var(--t2);margin-bottom:6px;font-weight:600">SEGMENTOS</div>
@@ -4330,25 +4332,51 @@ function abrirFichaCliente(id){
       ${adm?`<button class="btn br sm" onclick="M.close();delEmp(${e.id})">🗑️</button>`:''}
     </div>
 
+    ${adm?`<button onclick="salvarFichaCliente(${e.id})" style="width:100%;padding:11px;background:#1565C0;border:none;border-radius:10px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--F);margin-top:2px">
+      💾 Salvar Alterações
+    </button>`:''}
+
   </div>`;
 
-  // Oculta botão salvar (ficha salva em tempo real no onblur)
   const btn=$('mod-save-btn'); if(btn) btn.style.display='none';
   $('MOD').classList.add('open');
-  // Restaura botão ao fechar
   $('MOD').addEventListener('click', function once(ev){
     if(ev.target===$('MOD')){ const b=$('mod-save-btn');if(b)b.style.display=''; this.removeEventListener('click',once); }
   });
 }
 
+function salvarFichaCliente(id){
+  const e=DB.empresas.find(x=>x.id===id); if(!e) return;
+  // Lê todos os campos do formulário
+  const campos={
+    nome:'fc-nome', doc:'fc-doc', contato:'fc-cargo',
+    tel:'fc-tel', tel2:'fc-tel2', email:'fc-email',
+    rua:'fc-rua', num:'fc-num', bairro:'fc-bairro',
+    cidade:'fc-cidade', ref:'fc-ref', obs:'fc-obs', nasc:'fc-nasc'
+  };
+  Object.entries(campos).forEach(([field, inputId])=>{
+    const el=$(inputId);
+    if(el) e[field]=(el.value||'').trim();
+  });
+  // Sincroniza contato vinculado
+  const c=DB.contatos.find(x=>x.nome===e.nome||x.emp===e.nome);
+  if(c){
+    ['tel','tel2','email','bairro','cidade','rua','num','ref','obs'].forEach(f=>{ c[f]=e[f]; });
+  }
+  rClientes(); updKPI(); autoSave();
+  M.close();
+  toast(`✅ ${e.nome} atualizado com sucesso!`);
+}
+
 // Helper: cria campo da ficha (editável ou somente leitura)
-function campoFicha(label, valor, editavel, onchange, tipo, style){
+function campoFicha(label, valor, editavel, onchange, tipo, style, inputId){
   const vazio=!valor||valor==='—';
   return `<div style="display:flex;flex-direction:column;gap:3px${style?';'+style:''}">
     <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.7px;font-weight:700">${label}</div>
     ${editavel
       ?`<input type="${tipo||'text'}" value="${(valor||'').replace(/"/g,'&quot;')}" placeholder="—"
-          onchange="${onchange}"
+          ${inputId?`id="${inputId}"`:''}
+          ${onchange?`onchange="${onchange}"`:''}
           style="background:var(--s1);border:1px solid var(--bd);border-radius:7px;padding:6px 9px;font-size:12.5px;font-family:var(--F);color:var(--t1);width:100%;box-sizing:border-box;transition:border-color .15s"
           onfocus="this.style.borderColor='var(--gold)'"
           onblur="this.style.borderColor='var(--bd)'">`
