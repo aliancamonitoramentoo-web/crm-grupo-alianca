@@ -8123,10 +8123,10 @@ function salvarCliente(){
   const num=($('cli-num')?.value||'').trim();
   const ref=($('cli-ref')?.value||'').trim();
   const nasc=($('cli-nasc')?.value||'');
+  const segmento=($('cli-segmento')?.value||'').trim();
   const obs=($('cli-obs')?.value||'').trim();
   const temVenda=$('cli-tem-venda')?.checked||false;
 
-  // Verifica duplicidade
   if(DB.empresas.find(e=>e.nome.toLowerCase()===nome.toLowerCase())){
     toast('⚠️ Já existe um cliente com esse nome!');return;
   }
@@ -8137,7 +8137,7 @@ function salvarCliente(){
   DB.empresas.push({
     id:eid,nome,contato:cargo,tel,tel2,email,
     bairro,cidade,rua,num,ref,s:'pr',val:0,
-    cor:corCli,tag:'mo',tipo,doc,nasc,obs
+    cor:corCli,tag:'mo',tipo,doc,nasc,segmento,obs
   });
   DB.contatos.push({
     id:uid(),tipo,nome,doc,cargo,tel,tel2,email,
@@ -8146,7 +8146,7 @@ function salvarCliente(){
   });
 
   if(temVenda){
-    const tag=($('cli-tag')?.value)||'sv';
+    const tag=($('cli-tag')?.value)||'mo';
     const valRaw=($('cli-val')?.value||'').replace(/\D/g,'');
     const val=parseInt(valRaw)||0;
     const stage=parseInt($('cli-stage')?.value||'0');
@@ -8160,14 +8160,12 @@ function salvarCliente(){
 
   DB.notifs.unshift({ic:'👥',t:`Novo cliente: ${nome}`,sub:tipo==='pf'?'Pessoa Física':'Pessoa Jurídica',time:nowStr(),tipo:'unread'});
   adicionarEvento(nome,'geral','Cliente cadastrado','👥');
-
   rClientes();rPipeline();rMapa();rNotifs();updKPI();autoSave();
 
-  // Reseta botão e fecha modal
   const btn=$('mod-save-btn');
   if(btn){btn.textContent='Salvar';btn.onclick=()=>M.save();}
   M.close();
-  toast(`✅ ${nome} cadastrado com sucesso!${temVenda?' + Venda no Pipeline':''}`);
+  toast(`✅ ${nome} cadastrado!${temVenda?' + Venda no Pipeline':''}${segmento?' · '+segmento.split('|').join(', '):''}`);
 }
 
 
