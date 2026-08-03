@@ -8247,52 +8247,60 @@ function coletarVencimentosDia(){
 }
 
 function mostrarResumoDia(itens){
-  const hoje=new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+  const hoje=new Date();
+  const dias=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+  const diaSemana=dias[hoje.getDay()];
+  const dataFmt=hoje.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
   const urgentes=itens.filter(i=>i.urgente);
-  const normais=itens.filter(i=>!i.urgente);
+  const cobranças=itens.filter(i=>i.tipo==='cobranca');
+  const agendaIt=itens.filter(i=>i.tipo==='agenda');
+  const tarefas=itens.filter(i=>i.tipo==='tarefa');
+  const os=itens.filter(i=>i.tipo==='os');
+  const followup=itens.filter(i=>i.tipo==='followup');
 
-  const tel=DB.empresas[0]?.tel||CU?.tel||'';
+  function secao(label,cor,bg,borda,lista,icone){
+    if(!lista.length) return '';
+    return `<div style="margin-bottom:12px">
+      <div style="font-size:10px;font-weight:700;color:${cor};text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">${icone} ${label}</div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        ${lista.map(it=>{
+          const telObj=it.obj?.tel||(DB.empresas.find(e=>e.nome===it.obj?.cli)?.tel)||'';
+          return `<div style="background:${bg};border:1px solid ${borda};border-radius:8px;padding:8px 10px;display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+            <div style="flex:1">
+              <div style="font-size:12px;font-weight:700;color:${cor}">${it.titulo}</div>
+              <div style="font-size:11px;color:var(--t2);margin-top:2px">${it.sub}</div>
+            </div>
+            ${telObj?`<a href="https://wa.me/55${telObj.replace(/\D/g,'')}" target="_blank"
+              style="font-size:10px;padding:3px 8px;background:rgba(0,196,140,.12);border:1px solid rgba(0,196,140,.25);border-radius:6px;color:var(--green);font-weight:700;text-decoration:none;white-space:nowrap;flex-shrink:0">💬</a>`:''}
+          </div>`;}).join('')}
+      </div>
+    </div>`;
+  }
 
-  $('mod-title').innerHTML='🔔 Resumo do Dia — '+hoje;
+  $('mod-title').innerHTML=`📋 Resumo do Dia — ${diaSemana}, ${dataFmt}`;
   $('mod-body').innerHTML=`
-    ${urgentes.length?`
-    <div style="background:rgba(255,69,96,.08);border:1px solid rgba(255,69,96,.2);border-radius:10px;padding:12px;margin-bottom:12px">
-      <div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:8px">🚨 Urgente (${urgentes.length})</div>
-      ${urgentes.map(it=>`
-        <div style="display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px solid rgba(255,69,96,.1)">
-          <span style="font-size:15px">${it.ic}</span>
-          <div>
-            <div style="font-size:12px;font-weight:700;color:var(--red)">${it.titulo}</div>
-            <div style="font-size:11px;color:var(--t2)">${it.sub}</div>
-          </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px">
+      ${[{l:'Cobranças',v:cobranças.length,cor:'#3d9bff'},{l:'Agenda',v:agendaIt.length,cor:'var(--green)'},{l:'Tarefas',v:tarefas.length,cor:'var(--gold)'},{l:'OS/Outros',v:os.length,cor:'var(--red)'}]
+        .map(k=>`<div style="background:var(--s2);border-radius:8px;padding:8px;text-align:center">
+          <div style="font-size:20px;font-weight:900;color:${k.cor}">${k.v}</div>
+          <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">${k.l}</div>
         </div>`).join('')}
-    </div>`:''}
-    ${normais.length?`
-    <div style="background:var(--s2);border-radius:10px;padding:12px;margin-bottom:12px">
-      <div style="font-size:11px;font-weight:700;color:var(--gold);margin-bottom:8px">📋 Hoje (${normais.length})</div>
-      ${normais.map(it=>`
-        <div style="display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px solid var(--bd)">
-          <span style="font-size:15px">${it.ic}</span>
-          <div>
-            <div style="font-size:12px;font-weight:700">${it.titulo}</div>
-            <div style="font-size:11px;color:var(--t2)">${it.sub}</div>
-          </div>
-        </div>`).join('')}
-    </div>`:''}
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      ${EQUIPE_NUMEROS.map(m=>`
-        <a href="https://wa.me/${m.tel}?text=${encodeURIComponent(montarTextoResumo())}" target="_blank"
-          onclick="M.close()"
-          style="flex:1;padding:10px;background:rgba(0,196,140,.1);border:1px solid rgba(0,196,140,.25);border-radius:9px;color:var(--green);font-size:12px;font-weight:700;cursor:pointer;text-align:center;text-decoration:none;display:block">
-          💬 WhatsApp — ${m.nome}
-        </a>`).join('')}
-      <button onclick="enviarResumoEmail()" style="flex:1;padding:10px;background:rgba(61,155,255,.1);border:1px solid rgba(61,155,255,.3);border-radius:9px;color:#3d9bff;font-size:12px;font-weight:700;cursor:pointer">
-        📧 E-mail
-      </button>
+    </div>
+    ${urgentes.length?`<div style="background:rgba(255,69,96,.08);border:1px solid rgba(255,69,96,.2);border-radius:8px;padding:8px 10px;margin-bottom:12px;font-size:11px;color:var(--red);font-weight:700;text-align:center">🚨 ${urgentes.length} item(ns) urgente(s) — atenção imediata!</div>`:''}
+    ${secao('Urgente','var(--red)','rgba(255,69,96,.06)','rgba(255,69,96,.2)',urgentes,'🚨')}
+    ${secao('Cobranças','#3d9bff','rgba(61,155,255,.06)','rgba(61,155,255,.2)',cobranças.filter(i=>!i.urgente),'💸')}
+    ${secao('Agenda do Dia','var(--green)','rgba(0,196,140,.06)','rgba(0,196,140,.2)',agendaIt,'📅')}
+    ${secao('Tarefas','var(--gold)','rgba(245,166,35,.06)','rgba(245,166,35,.2)',tarefas,'✅')}
+    ${secao('OS em Atraso','var(--orange)','rgba(255,140,66,.06)','rgba(255,140,66,.2)',os,'🔧')}
+    ${secao('Follow-up VIP','var(--gold)','rgba(245,166,35,.06)','rgba(245,166,35,.2)',followup,'⭐')}
+    <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap">
+      ${EQUIPE_NUMEROS.map(m=>`<a href="https://wa.me/${m.tel}?text=${encodeURIComponent(montarTextoResumo())}" target="_blank"
+        style="flex:1;padding:10px;background:rgba(0,196,140,.1);border:1px solid rgba(0,196,140,.25);border-radius:9px;color:var(--green);font-size:12px;font-weight:700;text-align:center;text-decoration:none;display:block;min-width:120px">
+        💬 WhatsApp — ${m.nome}</a>`).join('')}
     </div>`;
 
   const btn=$('mod-save-btn');
-  if(btn){btn.textContent='Fechar';btn.onclick=()=>{btn.textContent='Salvar';btn.onclick=()=>M.save();M.close();};}
+  if(btn){btn.style.display='';btn.textContent='Fechar';btn.onclick=()=>{btn.textContent='Salvar';btn.onclick=()=>M.save();M.close();};}
   $('MOD').classList.add('open');
 }
 
@@ -8344,23 +8352,66 @@ function notificarAgendaCriada(ev){
 
 function montarTextoResumo(){
   const itens=coletarVencimentosDia();
-  const hoje=new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
-  if(!itens.length) return `Bom dia! ☀️\n\nNenhum compromisso pendente para hoje.\n\n— Grupo Aliança Monitoramento`;
+  const hoje=new Date();
+  const diaSemana=['Dom','Seg','Ter','Qua','Qui','Sex','Sab'][hoje.getDay()];
+  const dataFmt=hoje.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+  const horaFmt=hoje.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
 
-  let msg=`☀️ *Resumo do Dia — ${hoje}*\n\n`;
+  if(!itens.length) return `📋 *Aliança — Resumo · ${diaSemana} ${dataFmt}*\n\n✅ Nenhum item pendente para hoje. Bom trabalho!\n\n*Grupo Aliança Monitoramento* 🛡️`;
+
   const urgentes=itens.filter(i=>i.urgente);
-  const normais=itens.filter(i=>!i.urgente);
+  const cobranças=itens.filter(i=>i.tipo==='cobranca');
+  const agenda=itens.filter(i=>i.tipo==='agenda');
+  const tarefas=itens.filter(i=>i.tipo==='tarefa');
+  const os=itens.filter(i=>i.tipo==='os');
+  const followup=itens.filter(i=>i.tipo==='followup');
+
+  let msg=`📋 *Aliança — Resumo · ${diaSemana} ${dataFmt}*\n`;
+  msg+=`_Gerado às ${horaFmt}_\n`;
 
   if(urgentes.length){
-    msg+=`🚨 *URGENTE*\n`;
-    urgentes.forEach(it=>{ msg+=`${it.ic} ${it.titulo}\n   ${it.sub}\n`; });
-    msg+='\n';
+    msg+=`\n🚨 *URGENTE*\n`;
+    urgentes.forEach(it=>{
+      msg+=`• ${it.sub}\n`;
+    });
   }
-  if(normais.length){
-    msg+=`📋 *HOJE*\n`;
-    normais.forEach(it=>{ msg+=`${it.ic} ${it.titulo}\n   ${it.sub}\n`; });
+
+  if(cobranças.length){
+    msg+=`\n💸 *Cobranças*\n`;
+    cobranças.forEach(it=>{
+      msg+=`• ${it.titulo.replace('Cobrança vence hoje — ','').replace('Cobrança atrasada — ','⚠️ ').replace('Cobrança vence amanhã — ','⏰ ')} · ${it.sub.split(' · ')[0]}\n`;
+    });
   }
-  msg+=`\n— Grupo Aliança Monitoramento 🛡️`;
+
+  if(agenda.length){
+    msg+=`\n📅 *Agenda*\n`;
+    agenda.forEach(it=>{
+      msg+=`• ${it.sub||it.titulo}\n`;
+    });
+  }
+
+  if(tarefas.length){
+    msg+=`\n✅ *Tarefas*\n`;
+    tarefas.forEach(it=>{
+      msg+=`• ${it.sub}\n`;
+    });
+  }
+
+  if(os.length){
+    msg+=`\n🔧 *OS em atraso*\n`;
+    os.forEach(it=>{
+      msg+=`• ${it.sub}\n`;
+    });
+  }
+
+  if(followup.length){
+    msg+=`\n⭐ *Follow-up VIP*\n`;
+    followup.forEach(it=>{
+      msg+=`• ${it.sub}\n`;
+    });
+  }
+
+  msg+=`\n*Grupo Aliança Monitoramento* 🛡️`;
   return msg;
 }
 
@@ -9342,4 +9393,3 @@ function initApp(){
 
 </body>
 </html>
-  
