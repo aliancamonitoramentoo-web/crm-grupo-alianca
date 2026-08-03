@@ -3431,23 +3431,23 @@ const MFRM={
     <input class="fc" id="cli-ref" placeholder="Ex: Próximo ao Shopping Recife"></div>
   <div class="fg" id="cli-campo-doc2"><label id="cli-lbl-nasc">Data de Nascimento / Fundação</label>
     <input class="fc" id="cli-nasc" type="date"></div>
-  <div class="fg"><label>Segmento / Ramo de Atividade</label>
-    <select class="fc" id="cli-segmento">
-      <option value="">— Selecione —</option>
-      <option>Residencial</option>
-      <option>Condominio Residencial</option>
-      <option>Condominio Comercial</option>
-      <option>Comercio / Loja</option>
-      <option>Empresa / Escritorio</option>
-      <option>Industria / Fabrica</option>
-      <option>Escola / Colegio</option>
-      <option>Clinica / Hospital</option>
-      <option>Igreja / Templo</option>
-      <option>Restaurante / Bar</option>
-      <option>Posto de Combustivel</option>
-      <option>Farmacia</option>
-      <option>Outro</option>
-    </select>
+  <div class="fg"><label>Segmentos / Ramos de Atividade <span style="color:var(--t3)">(adicione quantos quiser)</span></label>
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <input class="fc" id="cli-seg-input" placeholder="Ex: Residencial, Mercado, Motel, Clínica..." style="flex:1"
+        onkeydown="if(event.key==='Enter'||event.key===','){event.preventDefault();adicionarSegmento()}"
+        list="seg-sugestoes">
+      <datalist id="seg-sugestoes">
+        <option>Residencial</option><option>Condomínio Residencial</option><option>Condomínio Comercial</option>
+        <option>Mercado / Supermercado</option><option>Comercio / Loja</option><option>Motel / Hotel</option>
+        <option>Empresa / Escritório</option><option>Indústria / Fábrica</option><option>Escola / Colégio</option>
+        <option>Clínica / Hospital</option><option>Igreja / Templo</option><option>Restaurante / Bar</option>
+        <option>Posto de Combustível</option><option>Farmácia</option><option>Salão de Beleza</option>
+        <option>Academia</option><option>Padaria</option><option>Oficina Mecânica</option>
+      </datalist>
+      <button type="button" onclick="adicionarSegmento()" style="padding:8px 14px;background:var(--gold);border:none;border-radius:8px;color:#000;font-weight:700;cursor:pointer;font-size:12px;flex-shrink:0">+ Add</button>
+    </div>
+    <div id="cli-seg-tags" style="display:flex;flex-wrap:wrap;gap:5px;min-height:28px"></div>
+    <input type="hidden" id="cli-segmento" value="">
   </div>
   <div class="fg"><label>Observações</label>
     <textarea class="fc" id="cli-obs" rows="2" placeholder="Anotações, preferências, histórico..."></textarea>
@@ -3742,7 +3742,7 @@ const M={
       const num=($('cli-num')?.value||'').trim();
       const ref=($('cli-ref')?.value||'').trim();
       const nasc=($('cli-nasc')?.value||'');
-      const segmento=($('cli-segmento')?.value||'').trim();
+      const segmento=($('cli-segmento')?.value||'').trim(); // múltiplos separados por |
       const obs=($('cli-obs')?.value||'').trim();
       const temVenda=$('cli-tem-venda')?.checked||false;
 
@@ -4199,7 +4199,7 @@ function rClientes(list){
       </div>
       <div style="padding:8px 15px;background:var(--s2);border-top:1px solid var(--bd);display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         ${[{ic:'🔧',v:nOS,l:'OS'},{ic:'📄',v:nConts,l:'Contratos'},{ic:'🔀',v:nDeals,l:'Vendas'}].map(s=>`<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:${s.v>0?'var(--t1)':'var(--t3)'}"><span>${s.ic}</span><strong>${s.v}</strong><span style="color:var(--t3)">${s.l}</span></div>`).join('')}
-        ${e.segmento?`<span style="font-size:9px;color:var(--t3)">${e.segmento}</span>`:''}
+        ${e.segmento?(e.segmento.split('|').filter(Boolean).map(s=>`<span style="font-size:9px;color:var(--t3)">${s}</span>`).join(' · ')):''}
         <div style="margin-left:auto;display:flex;gap:5px;align-items:center">
           ${e.tel?`<button onclick="event.stopPropagation();enviarDicaPersonalizada(${e.id})" title="Enviar dica personalizada" style="font-size:10px;padding:3px 7px;background:rgba(61,155,255,.1);border:1px solid rgba(61,155,255,.2);border-radius:6px;color:#3d9bff;cursor:pointer;font-family:var(--F)">💡 Dica</button>`:''}
           ${aniversarioHoje(e)?`<span style="font-size:10px;padding:2px 7px;background:rgba(245,166,35,.15);border:1px solid rgba(245,166,35,.3);border-radius:10px;color:var(--gold);font-weight:700">🎂 Hoje!</span>`:''}
@@ -4260,6 +4260,24 @@ function abrirFichaCliente(id){
         ${campoFicha('Cidade',e.cidade||'',adm,'editEmp('+e.id+',"cidade",this.value)','text')}
         ${campoFicha('Ponto de Referência',e.ref||'',adm,'editEmp('+e.id+',"ref",this.value)','text','grid-column:1/-1')}
         ${campoFicha('Observações',e.obs||'',adm,'editEmp('+e.id+',"obs",this.value)','text','grid-column:1/-1')}
+        <!-- Segmentos -->
+        <div style="grid-column:1/-1">
+          <div style="font-size:10px;color:var(--t2);margin-bottom:6px;font-weight:600">SEGMENTOS</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px">
+            ${(e.segmento||'').split('|').filter(Boolean).map(s=>`<span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;background:rgba(245,166,35,.15);border:1px solid rgba(245,166,35,.3);border-radius:20px;font-size:11px;font-weight:600;color:var(--gold)">${s}${adm?` <span onclick="removerSegmentoFicha(${e.id},'${s.replace(/'/g,"\\'")}',this.parentElement)" style="cursor:pointer;font-size:13px;color:var(--t3);line-height:1">×</span>`:''}</span>`).join('')||'<span style="font-size:11px;color:var(--t3);font-style:italic">Nenhum segmento</span>'}
+          </div>
+          ${adm?`<div style="display:flex;gap:6px">
+            <input class="fc" id="seg-add-${e.id}" placeholder="Ex: Mercado, Hotel..." style="flex:1;padding:6px 10px;font-size:12px"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();adicionarSegmentoFicha(${e.id})}"
+              list="seg-sugestoes-ficha">
+            <datalist id="seg-sugestoes-ficha">
+              <option>Residencial</option><option>Mercado</option><option>Motel/Hotel</option>
+              <option>Condomínio</option><option>Comércio</option><option>Clínica</option>
+              <option>Restaurante</option><option>Farmácia</option><option>Escola</option>
+            </datalist>
+            <button onclick="adicionarSegmentoFicha(${e.id})" style="padding:6px 12px;background:var(--gold);border:none;border-radius:8px;color:#000;font-weight:700;cursor:pointer;font-size:12px">+ Add</button>
+          </div>`:''}
+        </div>
       </div>
     </div>
 
@@ -8992,13 +9010,18 @@ const DICAS_SEGMENTO = {
   ],
 };
 
-function dicaParaSegmento(segmento){
-  const dicas=DICAS_SEGMENTO[segmento]||[
-    'Revisao periodica do seu sistema garante que tudo funciona perfeitamente.',
+function dicaParaSegmento(segmentoStr){
+  const segs=(segmentoStr||'').split('|').filter(Boolean);
+  // Usa o primeiro segmento que tiver dica
+  for(const seg of segs){
+    const dicas=DICAS_SEGMENTO[seg];
+    if(dicas) return dicas[Math.floor(Date.now()/86400000)%dicas.length];
+  }
+  return [
+    'Revisão periódica do seu sistema garante que tudo funciona perfeitamente.',
     'Lembrete: baterias de backup dos alarmes devem ser trocadas a cada 2 anos.',
-    'Manutencao preventiva evita falhas nos momentos mais criticos.',
-  ];
-  return dicas[Math.floor(Date.now()/86400000)%dicas.length];
+    'Manutenção preventiva evita falhas nos momentos mais críticos.',
+  ][Math.floor(Date.now()/86400000)%3];
 }
 
 function verificarAniversarios(){
@@ -9253,6 +9276,77 @@ Responda de forma clara e organizada em portugues. Seja objetivo e direto.`;
 function marcarFollowUpFeito(clienteId){
   const e=DB.empresas.find(x=>x.id===clienteId);
   if(e){ e.followup5=Date.now(); autoSave(); rClientes(); toast('✅ Follow-up registrado!'); }
+}
+
+
+function adicionarSegmentoFicha(id){
+  const e=DB.empresas.find(x=>x.id===id); if(!e) return;
+  const input=$(`seg-add-${id}`); if(!input) return;
+  const val=input.value.trim(); if(!val) return;
+  const atual=(e.segmento||'').split('|').filter(Boolean);
+  if(atual.includes(val)){toast('Segmento já adicionado!');input.value='';return;}
+  atual.push(val);
+  e.segmento=atual.join('|');
+  input.value='';
+  autoSave();
+  // Re-abre a ficha
+  abrirFichaCliente(id);
+  toast(`✅ "${val}" adicionado!`);
+}
+
+function removerSegmentoFicha(id, val, tagEl){
+  const e=DB.empresas.find(x=>x.id===id); if(!e) return;
+  const atual=(e.segmento||'').split('|').filter(Boolean);
+  e.segmento=atual.filter(s=>s!==val).join('|');
+  tagEl?.remove();
+  autoSave();
+  abrirFichaCliente(id);
+  toast(`Segmento "${val}" removido!`);
+}
+
+function adicionarSegmento(){
+  const input=$('cli-seg-input'); if(!input) return;
+  const val=input.value.trim(); if(!val) return;
+  const hidden=$('cli-segmento');
+  const tags=$('cli-seg-tags');
+  if(!tags||!hidden) return;
+  const atual=hidden.value?hidden.value.split('|').filter(Boolean):[];
+  if(atual.includes(val)){input.value='';return;}
+  atual.push(val);
+  hidden.value=atual.join('|');
+  renderSegTags();
+  input.value='';
+}
+
+function renderSegTags(){
+  const hidden=$('cli-segmento');
+  const tags=$('cli-seg-tags');
+  if(!tags||!hidden) return;
+  const lista=hidden.value?hidden.value.split('|').filter(Boolean):[];
+  tags.innerHTML=lista.map(s=>{
+    const sp=document.createElement('span');
+    sp.setAttribute('data-seg',s);
+    sp.style.cssText='display:inline-flex;align-items:center;gap:5px;padding:3px 10px;background:rgba(245,166,35,.15);border:1px solid rgba(245,166,35,.3);border-radius:20px;font-size:11px;font-weight:600;color:var(--gold)';
+    sp.innerHTML=s+' <span onclick="removerSegTag(this)" style="cursor:pointer;font-size:13px;color:var(--t3);line-height:1">×</span>';
+    return sp.outerHTML;
+  }).join('');
+}
+
+function removerSegTag(el){
+  const tag=el.parentElement;
+  const val=tag.dataset.seg;
+  const hidden=$('cli-segmento');
+  if(!hidden) return;
+  hidden.value=hidden.value.split('|').filter(s=>s&&s!==val).join('|');
+  tag.remove();
+}
+
+
+function removerSegmento(val, tagEl){
+  const hidden=$('cli-segmento'); if(!hidden) return;
+  const atual=hidden.value.split('|').filter(Boolean);
+  hidden.value=atual.filter(s=>s!==val).join('|');
+  tagEl?.remove();
 }
 
 
