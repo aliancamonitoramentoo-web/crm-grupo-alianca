@@ -446,10 +446,10 @@ tr:hover td{background:rgba(255,255,255,.017);}
 <div class="pg" id="pg-pipeline">
   <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
     <div class="fb on" onclick="fpipe(this,null)">Todos</div>
-    <div class="fb" onclick="fpipe(this,'mo')">📹 CRM Inteligente</div>
+    <div class="fb" onclick="fpipe(this,'mo')">📹 Monitoramento</div>
     <div class="fb" onclick="fpipe(this,'al')">🚨 Alarme</div>
-    <div class="fb" onclick="fpipe(this,'co')">🚪 Acesso</div>
-    <div class="fb" onclick="fpipe(this,'ca')">🎥 Serviço</div>
+    <div class="fb" onclick="fpipe(this,'co')">🚪 Controle de Acesso</div>
+    <div class="fb" onclick="fpipe(this,'ca')">🎥 Cameras / CFTV</div>
     <div class="fb" onclick="fpipe(this,'ra')">📡 Rastreamento</div>
     <div style="margin-left:auto">
       <button class="btn bg sm adm" onclick="abrirNovaVendaModal()">🔥 + Nova Venda</button>
@@ -1236,7 +1236,7 @@ const AVC=['#f5a623','#b08fff','#00d97e','#ff8c42','#ff4560','#3d9bff'];
 const avc=i=>AVC[i%AVC.length];
 
 // TAGL e TAGC são dinâmicos — leem de DB.adminCfg.servicos em tempo real
-const TAGL_BASE={mo:'📹 Monitoramento',al:'🚨 Alarme',co:'🚪 Acesso',ca:'🎥 Serviço',ra:'📡 Rastreamento'};
+const TAGL_BASE={mo:'📹 Monitoramento',al:'🚨 Alarme',co:'🚪 Controle de Acesso',ca:'🎥 Cameras / CFTV',ra:'📡 Rastreamento'};
 const TAGC_BASE={mo:'tmo',al:'tal',co:'tco',ca:'tca',ra:'tra'};
 
 // Proxy dinâmico que sempre reflete DB.adminCfg
