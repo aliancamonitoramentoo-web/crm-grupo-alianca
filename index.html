@@ -1908,7 +1908,11 @@ function editEmp(id,field,v){
   // Sincroniza contato vinculado
   const c=DB.contatos.find(x=>x.nome===e.nome||x.emp===e.nome);
   if(c&&['tel','tel2','email','bairro','cidade','rua','num','ref','obs'].includes(field)) c[field]=e[field];
-  rMapa(); autoSave();
+  // Debounce — não re-renderiza a ficha, só salva
+  clearTimeout(window._editEmpTimer);
+  window._editEmpTimer=setTimeout(()=>{
+    rClientes(); updKPI(); autoSave();
+  }, 800);
 }
 function delEmp(id){
   if(!confirm('Remover empresa e contatos vinculados?'))return;
@@ -4343,7 +4347,11 @@ function campoFicha(label, valor, editavel, onchange, tipo, style){
   return `<div style="display:flex;flex-direction:column;gap:3px${style?';'+style:''}">
     <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.7px;font-weight:700">${label}</div>
     ${editavel
-      ?`<input type="${tipo||'text'}" value="${(valor||'').replace(/"/g,'&quot;')}" placeholder="—" onchange="${onchange}" style="background:var(--s1);border:1px solid var(--bd);border-radius:7px;padding:6px 9px;font-size:12.5px;font-family:var(--F);color:var(--t1);width:100%;box-sizing:border-box;transition:border-color .15s" onfocus="this.style.borderColor='var(--gold)'" onblur="this.style.borderColor='var(--bd)'">`
+      ?`<input type="${tipo||'text'}" value="${(valor||'').replace(/"/g,'&quot;')}" placeholder="—"
+          onchange="${onchange}"
+          style="background:var(--s1);border:1px solid var(--bd);border-radius:7px;padding:6px 9px;font-size:12.5px;font-family:var(--F);color:var(--t1);width:100%;box-sizing:border-box;transition:border-color .15s"
+          onfocus="this.style.borderColor='var(--gold)'"
+          onblur="this.style.borderColor='var(--bd)'">`
       :`<div style="font-size:12.5px;font-weight:600;color:${vazio?'var(--t3)':'var(--t1)'};font-style:${vazio?'italic':''}">${valor||'—'}</div>`
     }
   </div>`;
