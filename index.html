@@ -2113,27 +2113,120 @@ function rOS(){
   const adm=isAdmin();
   let data=[...DB.os];
   if(typeof _osFilter!=='undefined'&&_osFilter&&_osFilter!=='all') data=data.filter(o=>o.s===_osFilter);
-  if(!data.length){g.innerHTML=`<div style="grid-column:1/-1">${empty('🔧','Sem OS','Clique em "+ Nova OS" para criar')}</div>`;return;}
-  const pc={at:100,vt:60,ng:30,pr:10};
-  const bc={at:'var(--green)',vt:'var(--gold)',ng:'var(--orange)',pr:'var(--blue)'};
-  g.innerHTML=data.map(o=>`<div class="osc">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <span class="osid" style="font-weight:800;color:var(--gold)">${o.oid}</span>${st(o.s)}
+  if(!data.length){g.innerHTML=`<div style="grid-column:1/-1">${empty('🔧','Sem atendimentos','Clique em "+ Nova OS" para criar')}</div>`;return;}
+
+  const icTipo={
+    'Instalação':'🔧','Manutenção':'⚙️','Visita':'🏠','Vistoria':'🔍',
+    'Entrega':'📦','Suporte':'💻','Reunião':'🤝','Outro':'📌'
+  };
+  const corStatus={at:'var(--green)',vt:'var(--gold)',ng:'var(--orange)',pr:'var(--blue)',em:'#3d9bff'};
+  const lblStatus={at:'✅ Concluído',vt:'🔄 Em visita',ng:'⚙️ Em andamento',pr:'📋 Pendente',em:'🚀 Em execução'};
+  const pctStatus={at:100,vt:70,ng:50,pr:15,em:40};
+
+  g.innerHTML=data.map(o=>{
+    const ic=icTipo[o.tipo]||'🔧';
+    const cor=corStatus[o.s]||'var(--blue)';
+    const concluido=o.s==='at';
+    const emp=DB.empresas.find(e=>e.nome===o.cli)||{};
+
+    return `<div style="background:var(--s1);border:1px solid ${concluido?'rgba(0,217,126,.2)':'var(--bd)'};border-radius:14px;overflow:hidden;display:flex;flex-direction:column">
+      <!-- Header colorido -->
+      <div style="background:${cor}18;border-bottom:1px solid ${cor}30;padding:12px 14px;display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:22px">${ic}</span>
+          <div>
+            <div style="font-size:13px;font-weight:800;color:var(--t1)">${o.tipo}</div>
+            <div style="font-size:10px;font-weight:700;color:${cor}">${lblStatus[o.s]||o.s}</div>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:12px;font-weight:800;color:var(--gold)">${o.oid}</div>
+          <div style="font-size:10px;color:var(--t3)">${o.data||'—'}</div>
+        </div>
+      </div>
+
+      <!-- Corpo -->
+      <div style="padding:12px 14px;flex:1;display:flex;flex-direction:column;gap:6px">
+        <div style="font-size:13px;font-weight:700">🏢 ${o.cli}</div>
+        ${emp.tel?`<div style="font-size:11px;color:var(--t2)">📱 ${emp.tel}</div>`:''}
+        <div style="font-size:11px;color:var(--t2)">👷 ${o.tec||'Sem técnico'}</div>
+        ${o.endereco?`<div style="font-size:11px;color:var(--t3)">📍 ${o.endereco}</div>`:''}
+        ${o.desc?`<div style="font-size:11px;color:var(--t3);font-style:italic;border-top:1px solid var(--bd);padding-top:5px;margin-top:2px">📝 ${o.desc.substring(0,80)}${o.desc.length>80?'...':''}</div>`:''}
+      </div>
+
+      <!-- Barra de progresso -->
+      <div style="height:3px;background:var(--bd)">
+        <div style="height:100%;width:${pctStatus[o.s]||15}%;background:${cor};transition:width .5s ease"></div>
+      </div>
+
+      <!-- Botões de ação -->
+      <div style="padding:10px 14px;background:var(--s2);display:flex;gap:6px;flex-wrap:wrap">
+        ${!concluido?`
+          <button onclick="confirmarAtendimento(${o.id})"
+            style="flex:1;padding:8px;background:var(--green);border:none;border-radius:8px;color:#000;font-size:11px;font-weight:800;cursor:pointer;font-family:var(--F);min-width:100px">
+            ✅ Confirmar ${ic} ${o.tipo}
+          </button>`
+          :`<div style="flex:1;padding:8px;text-align:center;font-size:11px;color:var(--green);font-weight:700">✅ Atendimento confirmado</div>`}
+        <button onclick="abrirFichaOS(${o.id})"
+          style="padding:8px 10px;background:var(--s1);border:1px solid var(--bd);border-radius:8px;color:var(--t2);font-size:11px;cursor:pointer;font-family:var(--F)">
+          📋 Detalhes
+        </button>
+        ${emp.tel?`<a href="https://wa.me/55${emp.tel.replace(/\D/g,'')}" target="_blank"
+          style="padding:8px 10px;background:rgba(37,211,102,.12);border:1px solid rgba(37,211,102,.25);border-radius:8px;color:#25d366;font-size:11px;font-weight:700;text-decoration:none">
+          💬
+        </a>`:''}
+        ${adm?`<button onclick="delOS(${o.id})"
+          style="padding:8px 10px;background:rgba(255,69,96,.08);border:1px solid rgba(255,69,96,.2);border-radius:8px;color:var(--red);font-size:11px;cursor:pointer;font-family:var(--F)">
+          🗑️
+        </button>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function confirmarAtendimento(id){
+  const o=DB.os.find(x=>x.id===id); if(!o) return;
+  const ic={Instalação:'🔧',Manutenção:'⚙️',Visita:'🏠',Vistoria:'🔍',Entrega:'📦',Suporte:'💻',Reunião:'🤝'}[o.tipo]||'✅';
+
+  $('mod-title').innerHTML=`${ic} Confirmar — ${o.tipo}`;
+  $('mod-body').innerHTML=`
+    <div style="text-align:center;padding:8px 0 16px">
+      <div style="font-size:44px;margin-bottom:8px">${ic}</div>
+      <div style="font-size:15px;font-weight:800;margin-bottom:4px">${o.tipo} — ${o.oid}</div>
+      <div style="font-size:13px;color:var(--t2)">Cliente: <strong>${o.cli}</strong></div>
+      <div style="font-size:12px;color:var(--t3);margin-top:4px">Técnico: ${o.tec||'—'} · ${o.data||'—'}</div>
     </div>
-    <div style="font-size:13px;font-weight:700;margin-bottom:6px;color:var(--t1)">${o.tipo}</div>
-    <div style="display:flex;flex-direction:column;gap:4px;font-size:11.5px;color:var(--t2);margin-bottom:8px">
-      <span>🏢 <strong style="color:var(--t1)">${o.cli}</strong></span>
-      <span>👷 ${o.tec||'—'} &nbsp;·&nbsp; 📅 ${o.data||'—'}</span>
-      ${o.endereco?`<span style="color:var(--t3)">📍 ${o.endereco}</span>`:''}
-      ${o.desc?`<span style="color:var(--t3);font-style:italic">📝 ${o.desc.substring(0,60)}${o.desc.length>60?'...':''}</span>`:''}
+    <div style="background:var(--s2);border-radius:10px;padding:12px;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;color:var(--gold);margin-bottom:8px">📝 Observações da conclusão (opcional)</div>
+      <textarea class="fc" id="os-concl-obs" rows="3" placeholder="Descreva o que foi feito, peças utilizadas, observações importantes..."></textarea>
     </div>
-    <div style="display:flex;gap:5px">
-      <button class="btn bg" style="flex:1;justify-content:center;font-size:11px" onclick="abrirFichaOS(${o.id})">📋 Ver Detalhes / PDF</button>
-      ${adm?`<button class="btn bgr sm" onclick="concluirOS(${o.id})" title="Concluir OS">✓</button>`:''}
-      ${adm?`<button class="btn br sm" onclick="delOS(${o.id})" title="Remover">🗑️</button>`:''}
-    </div>
-    <div class="prog" style="margin-top:8px"><div class="pf" style="width:${pc[o.s]||10}%;background:${bc[o.s]||'var(--blue)'}"></div></div>
-  </div>`).join('');
+    <div style="display:flex;gap:8px">
+      <button onclick="concluirOSComObs(${o.id})"
+        style="flex:1;padding:12px;background:var(--green);border:none;border-radius:10px;color:#000;font-size:13px;font-weight:800;cursor:pointer;font-family:var(--F)">
+        ✅ Confirmar ${o.tipo}
+      </button>
+      <button onclick="M.close()"
+        style="padding:12px 16px;background:var(--s2);border:1px solid var(--bd);border-radius:10px;color:var(--t2);font-size:13px;cursor:pointer;font-family:var(--F)">
+        Cancelar
+      </button>
+    </div>`;
+
+  const btn=$('mod-save-btn');if(btn)btn.style.display='none';
+  $('MOD').classList.add('open');
+}
+
+function concluirOSComObs(id){
+  const o=DB.os.find(x=>x.id===id); if(!o) return;
+  const obs=($('os-concl-obs')?.value||'').trim();
+  o.s='at';
+  o.concluidoEm=new Date().toLocaleString('pt-BR');
+  o.concluidoPor=CU?.nome||'';
+  if(obs) o.soluc=obs;
+  adicionarEvento(o.cli,'os',`${o.tipo} concluído — OS ${o.oid}${obs?' · '+obs.substring(0,50):''}`,o.s==='at'?'✅':'🔧');
+  rOS(); updKPI(); autoSave();
+  const btn=$('mod-save-btn');if(btn)btn.style.display='';
+  M.close();
+  toast(`✅ ${o.tipo} confirmado! OS ${o.oid} concluída.`);
 }
 
 function abrirFichaOS(id){
@@ -4940,14 +5033,13 @@ function rInteligencia(){
 //  🤖 MOTOR DE IA — Claude API
 // ═══════════════════════════════════════════════════
 
-// ── Chave de IA pré-configurada para todos os usuários ──
-// Coloque sua chave sk-ant-... entre as aspas abaixo
-// Todos que entrarem no CRM vão usar automaticamente
-const _CHAVE_IA_GLOBAL = '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';
-
-let _apiKey = _CHAVE_IA_GLOBAL.startsWith('sk-ant')
-  ? _CHAVE_IA_GLOBAL
-  : localStorage.getItem('alianca_apikey') || '';
+// ── Chave de IA — carregada do servidor (segura) ──
+// A chave fica no Render como variável ANTHROPIC_KEY
+// Nunca aparece no código ou no GitHub
+let _apiKey = '';
+fetch('/api/key').then(r=>r.json()).then(d=>{
+  if(d.ok) _apiKey=d.key;
+}).catch(()=>{});
 
 function salvarApiKey(v){
   _apiKey = v.trim();
@@ -4982,25 +5074,20 @@ async function testarApiKey(){
 
 // Função central — chama a API do Claude
 async function chamarClaude(prompt, maxTokens=600, sistema=''){
-  if(!_apiKey) throw new Error('Chave de API não configurada. Vá em Configurações → IA.');
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+  // Usa o proxy do servidor — a chave NUNCA vai para o navegador
+  const resp = await fetch('/api/claude', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': _apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
+    headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-sonnet-4-6',
       max_tokens: maxTokens,
-      system: sistema || 'Você é um assistente especialista em vendas de seu negócio para a empresa Aliance CRM. Seja objetivo, prático e fale em português do Brasil. Use emojis com moderação.',
+      system: sistema || 'Você é um assistente especialista em vendas e segurança eletrônica para a Grupo Aliança Monitoramento. Seja objetivo, prático e fale em português do Brasil.',
       messages: [{ role: 'user', content: prompt }]
     })
   });
   if(!resp.ok){
     const err = await resp.json().catch(()=>({}));
-    throw new Error(err?.error?.message || `HTTP ${resp.status}`);
+    throw new Error(err?.error?.message || err?.error || `HTTP ${resp.status}`);
   }
   const data = await resp.json();
   return data.content?.[0]?.text || '';
