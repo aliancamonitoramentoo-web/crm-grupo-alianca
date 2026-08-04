@@ -866,7 +866,11 @@ tr:hover td{background:rgba(255,255,255,.017);}
     <div class="fb" onclick="filtrarHist(this,'contrato')">Contratos</div>
     <div class="fb" onclick="filtrarHist(this,'compra')">🛍️ Compras</div>
     <div class="fb" onclick="filtrarHist(this,'email')">E-mails</div>
-    <button class="btn bg sm adm" id="btn-add-compra" style="margin-left:auto;display:none" onclick="adicionarCompraCliente()">🛍️ + Registrar Compra</button>
+    <button class="btn bg sm" id="btn-add-compra" style="margin-left:auto;display:none" onclick="adicionarCompraCliente()">🛍️ + Registrar Compra</button>
+  </div>
+  <!-- Aviso quando nenhum cliente selecionado -->
+  <div id="hist-aviso-sel" style="background:rgba(61,155,255,.07);border:1px solid rgba(61,155,255,.2);border-radius:10px;padding:12px;text-align:center;font-size:12px;color:var(--t2);margin-bottom:4px">
+    👆 Selecione um cliente acima para ver o histórico e registrar compras anteriores
   </div>
   <div class="g2">
     <!-- Linha do tempo -->
@@ -6245,7 +6249,10 @@ function filtrarHist(el,f){
 
 function rHistorico(cliente){
   _histCliente=cliente||'';
-  // Mostra/esconde botão de adicionar compra
+
+  const aviso=$('hist-aviso-sel');
+  if(aviso) aviso.style.display=_histCliente?'none':'';
+
   const btnC=$('btn-add-compra');
   if(btnC) btnC.style.display=_histCliente?'':'none';
 
