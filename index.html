@@ -1516,6 +1516,7 @@ function go(id,el){
   if(id==='usuarios') setTimeout(rUsuarios,100);
   if(id==='proposta')  setTimeout(rPropostas,100);
   if(id==='cobrancas') setTimeout(rCobrancas,100);
+  if(id==='inteligencia') setTimeout(()=>{rInteligencia();rInteligenciaSelect();},100);
   if(id==='agenda')   setTimeout(()=>{rAgenda();rTasks();},100);
   if(id==='historico'){ setTimeout(()=>{popularHistoricoSel();rHistorico(_histCliente);},100); }
   if(id==='whatsapp') setTimeout(()=>{ rWACfg(); rWAAutoCfg(); },100);
