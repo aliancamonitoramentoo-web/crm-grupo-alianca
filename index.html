@@ -825,14 +825,23 @@ tr:hover td{background:rgba(255,255,255,.017);}
       </div>
     </div>
     <div class="fg" style="margin:0 0 10px">
-      <label>Cole a conversa do WhatsApp aqui *</label>
-      <textarea class="fc" id="wa-conversa" rows="6" placeholder="Cole aqui a conversa completa do WhatsApp com o cliente...
+      <label>Cole a conversa do WhatsApp aqui *
+        <span style="font-size:10px;color:var(--t3);font-weight:400;margin-left:8px">— ou importe o arquivo exportado do WhatsApp</span>
+      </label>
+      <div style="display:flex;gap:8px;margin-bottom:6px">
+        <label style="display:flex;align-items:center;gap:6px;padding:7px 12px;background:var(--s2);border:1px solid var(--bd);border-radius:8px;font-size:11px;color:var(--t2);cursor:pointer;flex-shrink:0">
+          📁 Importar .txt do WhatsApp
+          <input type="file" accept=".txt" style="display:none" onchange="importarConversaWA(this)">
+        </label>
+        <span style="font-size:10px;color:var(--t3);align-self:center">Como exportar: no WhatsApp → Conversa → ⋮ → Mais → Exportar conversa → Sem mídia</span>
+      </div>
+      <textarea class="fc" id="wa-conversa" rows="6" placeholder="Cole aqui a conversa do WhatsApp ou importe o arquivo .txt exportado...
 
 Exemplo:
 Cliente: Oi, vi vocês no instagram
 Você: Oi! Como posso ajudar?
 Cliente: Queria saber sobre câmeras, tenho um mercado
-Você: Que ótimo! Quantas câmeras tem hoje?
+Você: Quantas câmeras tem hoje?
 Cliente: Nenhuma ainda, quero instalar..."></textarea>
     </div>
     <button onclick="analisarConversaWA()" style="width:100%;padding:12px;background:var(--green);border:none;border-radius:10px;color:#000;font-size:13px;font-weight:800;cursor:pointer;font-family:var(--F)">
@@ -9346,6 +9355,33 @@ Seja objetivo, use o nome do cliente, máximo 180 palavras.`;
   }catch(err){
     $('mod-body').innerHTML=`<div style="text-align:center;color:var(--red);padding:20px">❌ ${err.message}</div>`;
   }
+}
+
+function importarConversaWA(input){
+  const file=input.files?.[0]; if(!file) return;
+  if(!file.name.endsWith('.txt')){toast('⚠️ Selecione um arquivo .txt exportado do WhatsApp!');return;}
+
+  const reader=new FileReader();
+  reader.onload=e=>{
+    let texto=e.target?.result||'';
+
+    // Limpa cabeçalho do WhatsApp (ex: "As mensagens e ligações são...")
+    texto=texto.replace(/^.*?criptografadas.*?\n/gmi,'').trim();
+    // Remove linhas de mídia omitida
+    texto=texto.replace(/^.*?<Mídia omitida>.*$/gm,'').replace(/^.*?<Media omitted>.*$/gm,'');
+    // Remove linhas de sistema
+    texto=texto.replace(/^\d{2}\/\d{2}\/\d{4}.*?adicion.*$/gm,'').replace(/^\d{2}\/\d{2}\/\d{4}.*?saiu.*$/gm,'');
+    // Normaliza formato: "01/08/2026, 14:30 - Nome: msg" → "Nome: msg"
+    texto=texto.replace(/^\d{2}\/\d{2}\/\d{4},?\s+\d{2}:\d{2}(?::\d{2})?\s+-\s+/gm,'').trim();
+
+    const area=$('wa-conversa');
+    if(area){
+      area.value=texto;
+      toast(`✅ Conversa importada! ${texto.split('\n').filter(l=>l.trim()).length} linhas carregadas.`);
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
+  input.value=''; // reset para permitir reimportar
 }
 
 async function analisarConversaWA(){
