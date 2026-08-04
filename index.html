@@ -5062,7 +5062,7 @@ function atualizarStatusKey(){
   }
 }
 async function testarApiKey(){
-  if(!_apiKey){ toast('⚠️ Cole sua chave de API primeiro!'); return; }
+  
   toast('🔄 Testando conexão...');
   try {
     const r = await chamarClaude('Responda apenas: "Conexão OK"', 50);
@@ -5112,7 +5112,7 @@ if(!document.getElementById('ai-spin-style')){
 // ── 1. ANÁLISE COMPLETA DO CLIENTE ────────
 async function iaAnalisarCliente(empNome){
   const el=$('ia-result-'+empNome.replace(/\s/g,'_'));
-  if(!_apiKey){ toast('⚠️ Configure sua chave de API em Configurações → IA'); return; }
+  
 
   const e=DB.empresas.find(x=>x.nome===empNome);
   const eqs=DB.equips[empNome]||[];
@@ -5160,7 +5160,7 @@ Seja direto e prático. Máximo 250 palavras.`;
 
 // ── 2. GERAR PROPOSTA PERSONALIZADA ───────
 async function iaGerarProposta(empNome){
-  if(!_apiKey){ toast('⚠️ Configure sua chave de API em Configurações → IA'); return; }
+  
   const e=DB.empresas.find(x=>x.nome===empNome);
   const eqs=DB.equips[empNome]||[];
   const conts=DB.contratos.filter(c=>c.cli===empNome&&c.s==='at');
@@ -5206,7 +5206,7 @@ Tom: profissional mas acessível. Máximo 200 palavras.`;
 
 // ── 3. MENSAGEM WHATSAPP INTELIGENTE ──────
 async function iaWhatsProposta(empNome){
-  if(!_apiKey){ toast('⚠️ Configure sua chave de API em Configurações → IA'); return; }
+  
   const e=DB.empresas.find(x=>x.nome===empNome);
   const eqs=DB.equips[empNome]||[];
   const fb=DB.feedbacks[empNome];
@@ -5250,7 +5250,7 @@ Escreva uma mensagem de WhatsApp (não e-mail!) que:
 
 // ── 4. RELATÓRIO MENSAL IA ────────────────
 async function iaRelatorioMensal(){
-  if(!_apiKey){ toast('⚠️ Configure sua chave de API em Configurações → IA'); return; }
+  
   const el=$('ia-relatorio');
   if(el) aiLoading('ia-relatorio');
 
@@ -8063,7 +8063,7 @@ function atualizarMetaLivre(id, val){
 
 async function analisarMetaIA(id){
   const m=DB.metas.find(x=>x.id===id); if(!m) return;
-  if(!_apiKey){ toast('⚠️ Configure sua chave de IA em ⚙️ Configurações → Inteligência IA'); go('config'); return; }
+  
 
   const atual=calcValorMeta(m);
   const alvo=parseFloat(m.alvo)||1;
@@ -9298,13 +9298,6 @@ function mostrarAniversariantes(lista){
 async function enviarDicaPersonalizada(clienteId){
   const e=DB.empresas.find(x=>x.id===clienteId);
   if(!e||!e.tel){toast('⚠️ Cliente sem telefone cadastrado!');return;}
-  if(!_apiKey){
-    // Usa dica pre-programada
-    const dica=dicaParaSegmento(e.segmento||'');
-    const msg=`Ola ${e.nome}! 👋\n\n💡 *Dica de Seguranca da Alianca:*\n\n${dica}\n\nQualquer duvida ou necessidade, estamos a disposicao!\n\n*Grupo Alianca Monitoramento* 🛡️`;
-    window.open(`https://wa.me/55${e.tel.replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`,'_blank');
-    return;
-  }
 
   toast('🤖 IA gerando dica personalizada...');
   const contratos=DB.contratos.filter(c=>c.cli===e.nome&&c.s==='at');
@@ -9374,7 +9367,7 @@ const SERVICOS_ALIANCA=[
 async function analisarEmpresaIA(clienteId){
   const e=DB.empresas.find(x=>x.id===clienteId);
   if(!e){toast('⚠️ Cliente não encontrado!');return;}
-  if(!_apiKey){toast('⚠️ Configure sua chave de IA em ⚙️ Configurações');go('config');return;}
+  
 
   $('mod-title').innerHTML='🤖 Analisando empresa...';
   $('mod-body').innerHTML=`<div style="text-align:center;padding:28px">
@@ -9481,7 +9474,7 @@ function importarConversaWA(input){
 async function analisarConversaWA(){
   const conversa=($('wa-conversa')?.value||'').trim();
   if(!conversa){toast('⚠️ Cole a conversa do WhatsApp primeiro!');return;}
-  if(!_apiKey){toast('⚠️ Configure sua chave de IA em ⚙️ Configurações');go('config');return;}
+  
 
   const cliNome=$('wa-anal-cli')?.value||'';
   const ctx=($('wa-anal-ctx')?.value||'').trim();
@@ -9672,10 +9665,7 @@ function registrarCompraRapida(cliente,produto,categoria){
 }
 
 async function analisarManutencaoIA(){
-  if(!_apiKey){
-    toast('⚠️ Configure sua chave de IA em ⚙️ Configurações → Inteligência IA');
-    go('config'); return;
-  }
+  
 
   // Abre modal com loading
   $('mod-title').innerHTML='🤖 Analisando clientes para Manutenção Gratuita...';
