@@ -4940,7 +4940,14 @@ function rInteligencia(){
 //  🤖 MOTOR DE IA — Claude API
 // ═══════════════════════════════════════════════════
 
-let _apiKey = localStorage.getItem('alianca_apikey') || '';
+// ── Chave de IA pré-configurada para todos os usuários ──
+// Coloque sua chave sk-ant-... entre as aspas abaixo
+// Todos que entrarem no CRM vão usar automaticamente
+const _CHAVE_IA_GLOBAL = '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';
+
+let _apiKey = _CHAVE_IA_GLOBAL.startsWith('sk-ant')
+  ? _CHAVE_IA_GLOBAL
+  : localStorage.getItem('alianca_apikey') || '';
 
 function salvarApiKey(v){
   _apiKey = v.trim();
