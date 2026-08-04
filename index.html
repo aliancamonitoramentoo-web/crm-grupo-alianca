@@ -802,13 +802,50 @@ tr:hover td{background:rgba(255,255,255,.017);}
 <!-- INTELIGÊNCIA DE CLIENTES -->
 
 <div class="pg" id="pg-inteligencia">
+
+  <!-- ANALISADOR DE CONVERSA WHATSAPP -->
+  <div style="background:linear-gradient(135deg,rgba(0,196,140,.1),rgba(61,155,255,.05));border:1px solid rgba(0,196,140,.25);border-radius:14px;padding:16px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <div style="font-size:28px">💬</div>
+      <div>
+        <div style="font-size:14px;font-weight:800;color:var(--green)">Analisador de Conversa WhatsApp</div>
+        <div style="font-size:12px;color:var(--t2)">Cole a conversa e a IA estuda e sugere o produto certo e a melhor abordagem de venda</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="fg" style="margin:0">
+        <label>Cliente (opcional)</label>
+        <select class="fc" id="wa-anal-cli">
+          <option value="">— Selecione se já é cliente —</option>
+        </select>
+      </div>
+      <div class="fg" style="margin:0">
+        <label>Contexto adicional (opcional)</label>
+        <input class="fc" id="wa-anal-ctx" placeholder="Ex: Dono de mercado, tem câmeras antigas...">
+      </div>
+    </div>
+    <div class="fg" style="margin:0 0 10px">
+      <label>Cole a conversa do WhatsApp aqui *</label>
+      <textarea class="fc" id="wa-conversa" rows="6" placeholder="Cole aqui a conversa completa do WhatsApp com o cliente...
+
+Exemplo:
+Cliente: Oi, vi vocês no instagram
+Você: Oi! Como posso ajudar?
+Cliente: Queria saber sobre câmeras, tenho um mercado
+Você: Que ótimo! Quantas câmeras tem hoje?
+Cliente: Nenhuma ainda, quero instalar..."></textarea>
+    </div>
+    <button onclick="analisarConversaWA()" style="width:100%;padding:12px;background:var(--green);border:none;border-radius:10px;color:#000;font-size:13px;font-weight:800;cursor:pointer;font-family:var(--F)">
+      🤖 Analisar Conversa e Sugerir Abordagem
+    </button>
+    <div id="wa-resultado" style="margin-top:12px"></div>
+  </div>
+
   <!-- Busca e Filtros -->
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
     <div class="srch" style="max-width:320px;flex:1"><span style="color:var(--t3)">🔍</span><input type="text" placeholder="Buscar cliente, equipamento..." id="intel-srch" oninput="rInteligencia()"></div>
     <div class="fb on" onclick="filterIntel(this,'all')">Todos</div>
     <div class="fb" onclick="filterIntel(this,'cam')">📹 Equipamentos</div>
-    <div class="fb" onclick="filterIntel(this,'eqp')">🖥️ Equipamento/Equipamento</div>
-    <div class="fb" onclick="filterIntel(this,'alarm')">🚨 Alarme</div>
     <div class="fb" onclick="filterIntel(this,'hot')">🔥 Alta chance</div>
     <div class="fb" onclick="filterIntel(this,'manut')">🔧 Manutenção</div>
   </div>
@@ -817,8 +854,8 @@ tr:hover td{background:rgba(255,255,255,.017);}
   <div class="g4">
     <div class="kpi kg"><div class="kic">🔥</div><div class="kl">Alta Probabilidade</div><div class="kv" id="ic-hot">0</div><div class="kd up">recompra em breve</div></div>
     <div class="kpi ko"><div class="kic">🔧</div><div class="kl">Manutenção Pendente</div><div class="kv" id="ic-manut">0</div><div class="kd">agendadas</div></div>
-    <div class="kpi kb"><div class="kic">📹</div><div class="kl">Clientes c/ Equipamento</div><div class="kv" id="ic-cam">0</div><div class="kd">instaladas</div></div>
-    <div class="kpi kp"><div class="kic">🖥️</div><div class="kl">Clientes c/ Equipamento/Equipamento</div><div class="kv" id="ic-dvr">0</div><div class="kd">sistemas</div></div>
+    <div class="kpi kb"><div class="kic">📹</div><div class="kl">Clientes c/ Câmeras</div><div class="kv" id="ic-cam">0</div><div class="kd">instaladas</div></div>
+    <div class="kpi kp"><div class="kic">📄</div><div class="kl">Com Contrato Ativo</div><div class="kv" id="ic-dvr">0</div><div class="kd">sistemas</div></div>
   </div>
 
   <!-- Lista de clientes -->
@@ -4338,6 +4375,9 @@ function abrirFichaCliente(id){
 
     ${adm?`<button onclick="salvarFichaCliente(${e.id})" style="width:100%;padding:11px;background:#1565C0;border:none;border-radius:10px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--F);margin-top:2px">
       💾 Salvar Alterações
+    </button>
+    <button onclick="analisarEmpresaIA(${e.id})" style="width:100%;padding:10px;background:rgba(61,155,255,.1);border:1px solid rgba(61,155,255,.25);border-radius:10px;color:#3d9bff;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--F);margin-top:6px">
+      🤖 IA — Analisar empresa e sugerir serviços
     </button>`:''}
 
   </div>`;
@@ -4736,7 +4776,7 @@ function saveEquipamento(empNome){
   // Feed
   addFeed('📦','rgba(0,217,126,.12)',`Equipamento instalado em ${empNome}: ${modelo} (${qtd}x) — Manutenção grátis: ${dtManutStr}`);
 
-  rNotifs();rAgenda();rInteligencia();
+  rNotifs();rAgenda();rInteligencia();rInteligenciaSelect();
   // Verifica lembretes imediatamente após salvar equipamento
   setTimeout(gerarLembretes, 500);
   M.close();
@@ -6165,8 +6205,11 @@ function adicionarCompraCliente(){
     <div style="background:rgba(61,155,255,.07);border:1px solid rgba(61,155,255,.2);border-radius:9px;padding:10px;margin-bottom:12px;font-size:12px;color:var(--t2)">
       ℹ️ Este registro é apenas para <strong>contexto e histórico</strong>. Não entra no financeiro nem no dashboard de vendas. Serve para a IA entender melhor o cliente.
     </div>
-    <div class="fg"><label>Produto / Serviço Comprado *</label>
-      <input class="fc" id="cp-produto" placeholder="Ex: Kit 4 câmeras HD, Alarme Intelbras, Cerca elétrica">
+    <div class="fg"><label>Produto / Serviço *</label>
+      <input class="fc" id="cp-produto" placeholder="Ex: Câmeras residencial, Alarme comercial, Cerca elétrica..." list="cp-produtos-list">
+      <datalist id="cp-produtos-list">
+        ${SERVICOS_ALIANCA.map(s=>`<option value="${s.nome}">`).join('')}
+      </datalist>
     </div>
     <div class="fg2">
       <div class="fg"><label>Data da Compra</label>
@@ -9194,6 +9237,228 @@ REGRAS:
   }
 }
 
+
+// ═══════════════════════════════════════════════════
+//  📦 CATÁLOGO DE SERVIÇOS — GRUPO ALIANÇA
+// ═══════════════════════════════════════════════════
+const SERVICOS_ALIANCA=[
+  // Monitoramento
+  {id:'mon-24h', cat:'📹 Monitoramento',    nome:'Monitoramento 24h',               desc:'Central de monitoramento que responde a qualquer alerta em tempo real'},
+  {id:'mon-cam', cat:'📹 Monitoramento',    nome:'Monitoramento de Câmeras IP',      desc:'Acompanhamento remoto das câmeras com alarme em caso de movimento'},
+  // Segurança de Condomínios
+  {id:'cond-seg',cat:'🏢 Condomínios',      nome:'Segurança de Condomínios',         desc:'Solução completa de segurança para condomínios residenciais e comerciais'},
+  {id:'cond-por',cat:'🏢 Condomínios',      nome:'Porteiros / Controle de Acesso',   desc:'Portaria remota e controle de entrada de visitantes e moradores'},
+  // Manutenção
+  {id:'man-pre', cat:'🔧 Manutenção',       nome:'Manutenção Preventiva',            desc:'Revisão periódica de todo o sistema para evitar falhas'},
+  {id:'man-cor', cat:'🔧 Manutenção',       nome:'Manutenção Corretiva',             desc:'Reparo emergencial de equipamentos com defeito'},
+  // 0800
+  {id:'0800-emp',cat:'📞 0800 Empresas',    nome:'0800 para Empresas',               desc:'Canal de atendimento gratuito para clientes e emergências da sua empresa'},
+  // Consultoria
+  {id:'con-seg', cat:'🎯 Consultoria',      nome:'Consultoria de Segurança',         desc:'Análise de vulnerabilidades e projeto personalizado de segurança'},
+  {id:'con-ven', cat:'🎯 Consultoria',      nome:'Consultoria de Vendas',            desc:'Estratégias para aumentar vendas usando segurança como diferencial'},
+  // IA
+  {id:'ia-cli',  cat:'🤖 IA',              nome:'IA para Ajudar Clientes',          desc:'Assistente inteligente para atendimento, suporte e vendas automatizadas'},
+  // Grupo VIP
+  {id:'grp-vip', cat:'⭐ Grupo VIP',       nome:'Grupo com Preços Diferenciados',   desc:'Acesso a preços exclusivos, prioridade no atendimento e benefícios especiais'},
+  // Câmeras e alarme (equipamentos)
+  {id:'cam-inst',cat:'📷 Câmeras / CFTV',  nome:'Instalação de Câmeras',            desc:'Câmeras IP, DVR/NVR, acesso remoto pelo celular'},
+  {id:'alar-ins',cat:'🚨 Alarme',          nome:'Alarme com Monitoramento',          desc:'Sistema de alarme integrado ao monitoramento 24h'},
+  {id:'cerc-ins',cat:'⚡ Cerca Elétrica',  nome:'Cerca Elétrica',                   desc:'Instalação e manutenção de cerca elétrica'},
+  {id:'rast-vel',cat:'📡 Rastreamento',    nome:'Rastreamento Veicular',             desc:'GPS em tempo real para carros e frotas'},
+];
+
+async function analisarEmpresaIA(clienteId){
+  const e=DB.empresas.find(x=>x.id===clienteId);
+  if(!e){toast('⚠️ Cliente não encontrado!');return;}
+  if(!_apiKey){toast('⚠️ Configure sua chave de IA em ⚙️ Configurações');go('config');return;}
+
+  $('mod-title').innerHTML='🤖 Analisando empresa...';
+  $('mod-body').innerHTML=`<div style="text-align:center;padding:28px">
+    <div style="font-size:36px;margin-bottom:12px">🔍</div>
+    <div style="font-size:14px;font-weight:700">Pesquisando "${e.nome}"...</div>
+    <div style="font-size:12px;color:var(--t2);margin-top:8px">Analisando perfil e buscando oportunidades de venda</div>
+    <div style="margin-top:16px;height:4px;background:var(--s2);border-radius:20px;overflow:hidden">
+      <div id="ai-prog2" style="height:100%;background:#3d9bff;border-radius:20px;width:0%;transition:width 3s ease"></div>
+    </div>
+  </div>`;
+  const btn=$('mod-save-btn');
+  if(btn){btn.style.display='';btn.textContent='Fechar';btn.onclick=()=>{btn.textContent='Salvar';btn.onclick=()=>M.save();M.close();};}
+  $('MOD').classList.add('open');
+  setTimeout(()=>{const p=$('ai-prog2');if(p)p.style.width='70%';},300);
+
+  const segs=(e.segmento||'').split('|').filter(Boolean).join(', ')||'não informado';
+  const comprasAnt=(DB.comprasClientes?.[e.nome]||[]).map(c=>c.produto).join(', ')||'nenhuma';
+  const servAtual=DB.contratos.filter(c=>c.cli===e.nome&&c.s==='at').map(c=>c.srv).join(', ')||'nenhum';
+  const catalogo=SERVICOS_ALIANCA.map(s=>`• ${s.nome} — ${s.desc}`).join('\n');
+
+  const prompt=`Você é consultor de vendas da Grupo Aliança Monitoramento (Santa Cruz do Capibaribe, PE, Brasil), empresa de segurança eletrônica.
+
+CLIENTE: "${e.nome}"
+Tipo: ${e.tipo==='pf'?'Pessoa Física':'Empresa/PJ'}
+Segmento: ${segs}
+Cidade: ${e.cidade||'não informada'}
+Serviços já contratados: ${servAtual}
+Compras anteriores: ${comprasAnt}
+Observações: ${e.obs||'nenhuma'}
+
+NOSSOS SERVIÇOS DISPONÍVEIS:
+${catalogo}
+
+Com base no perfil deste cliente e no que você sabe sobre empresas/pessoas deste segmento, responda:
+
+**PERFIL**
+(O que este tipo de cliente valoriza em segurança — 2 linhas)
+
+**TOP 3 SERVIÇOS MAIS PROVÁVEIS**
+(Liste em ordem de probabilidade de compra com motivo de cada)
+
+**MELHOR ABORDAGEM**
+(Como abordar, qual dor resolver, o que destacar)
+
+**OPORTUNIDADE**
+(Algo que ele provavelmente precisa mas ainda não tem)
+
+Seja objetivo, use o nome do cliente, máximo 180 palavras.`;
+
+  try{
+    const analise=await chamarClaude(prompt,800,'Você é especialista em vendas de segurança eletrônica no Nordeste do Brasil. Seja direto e comercialmente útil.');
+    const prog=$('ai-prog2');if(prog)prog.style.width='100%';
+
+    $('mod-title').innerHTML=`🤖 Análise — ${e.nome}`;
+    $('mod-body').innerHTML=`
+      <div style="background:rgba(61,155,255,.07);border:1px solid rgba(61,155,255,.2);border-radius:10px;padding:11px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#3d9bff">${e.nome}</div>
+          <div style="font-size:11px;color:var(--t3)">${segs} · ${e.cidade||'—'}</div>
+        </div>
+        <span style="font-size:10px;padding:2px 8px;background:rgba(0,196,140,.1);border:1px solid rgba(0,196,140,.2);border-radius:20px;color:var(--green)">🤖 IA + Dados do CRM</span>
+      </div>
+      <div style="font-size:13px;line-height:1.85;color:var(--t1)">${analise.replace(/\*\*(.*?)\*\*/g,'<strong style="color:var(--gold)">$1</strong>').replace(/\n/g,'<br>')}</div>
+      <div style="margin-top:14px;border-top:1px solid var(--bd);padding-top:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:8px">Registrar serviço no histórico deste cliente:</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px">
+          ${SERVICOS_ALIANCA.map(s=>`<button onclick="registrarCompraRapida('${e.nome.replace(/'/g,"\\'")}','${s.nome}','${s.cat}')" 
+            style="padding:4px 10px;background:var(--s2);border:1px solid var(--bd);border-radius:20px;font-size:10px;color:var(--t2);cursor:pointer;font-family:var(--F)">${s.cat.split(' ')[0]} ${s.nome}</button>`).join('')}
+        </div>
+      </div>
+      <div style="margin-top:10px;font-size:10px;color:var(--t3);text-align:center">🤖 Claude AI · ${new Date().toLocaleString('pt-BR')}</div>`;
+  }catch(err){
+    $('mod-body').innerHTML=`<div style="text-align:center;color:var(--red);padding:20px">❌ ${err.message}</div>`;
+  }
+}
+
+async function analisarConversaWA(){
+  const conversa=($('wa-conversa')?.value||'').trim();
+  if(!conversa){toast('⚠️ Cole a conversa do WhatsApp primeiro!');return;}
+  if(!_apiKey){toast('⚠️ Configure sua chave de IA em ⚙️ Configurações');go('config');return;}
+
+  const cliNome=$('wa-anal-cli')?.value||'';
+  const ctx=($('wa-anal-ctx')?.value||'').trim();
+  const cliData=cliNome?DB.empresas.find(e=>e.nome===cliNome):null;
+  const segs=cliData?(cliData.segmento||'').split('|').filter(Boolean).join(', '):'';
+  const historico=cliNome?(DB.comprasClientes?.[cliNome]||[]).map(c=>c.produto).join(', '):'';
+  const contratos=cliNome?DB.contratos.filter(c=>c.cli===cliNome&&c.s==='at').map(c=>c.srv).join(', '):'';
+
+  const catalogo=SERVICOS_ALIANCA.map(s=>`• ${s.nome}: ${s.desc}`).join('\n');
+
+  const res=$('wa-resultado');
+  if(res) res.innerHTML=`<div style="text-align:center;padding:16px;color:var(--t2)">
+    <div style="font-size:24px;margin-bottom:8px">🤖</div>
+    <div>Analisando conversa e buscando dados...</div>
+  </div>`;
+
+  const prompt=`Você é especialista em vendas da Grupo Aliança Monitoramento (Santa Cruz do Capibaribe, PE) — empresa de segurança eletrônica.
+
+CONVERSA DO WHATSAPP COM POSSÍVEL CLIENTE:
+"""
+${conversa}
+"""
+
+${cliNome?`DADOS DO CLIENTE NO CRM:
+- Nome: ${cliNome}
+- Segmento: ${segs||'não informado'}
+- Serviços atuais: ${contratos||'nenhum'}
+- Histórico de compras: ${historico||'nenhum'}`:''}
+${ctx?`CONTEXTO ADICIONAL: ${ctx}`:''}
+
+NOSSOS SERVIÇOS:
+${catalogo}
+
+Analise a conversa e responda:
+
+**🎯 PERFIL DO LEAD**
+(O que você descobriu sobre ele na conversa — necessidades, objeções, nível de interesse)
+
+**🏆 PRODUTO/SERVIÇO IDEAL**
+(Qual serviço da Aliança é o mais adequado e por quê)
+
+**💬 PRÓXIMA MENSAGEM IDEAL**
+(Escreva a próxima mensagem perfeita para enviar no WhatsApp — pronta para copiar e enviar)
+
+**⚠️ CUIDADOS**
+(O que evitar nesta negociação, objeções prováveis e como responder)
+
+**📊 PROBABILIDADE DE FECHAMENTO**
+(Baixa / Média / Alta — e o que fazer para aumentar)
+
+Seja direto. Use linguagem comercial mas humana.`;
+
+  try{
+    const analise=await chamarClaude(prompt, 1000,
+      'Você é especialista em vendas de segurança eletrônica no Nordeste do Brasil. Analise conversas de WhatsApp e dê orientações práticas de venda.');
+
+    if(res) res.innerHTML=`
+      <div style="background:var(--s2);border-radius:12px;padding:14px;border-left:4px solid var(--green)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-size:12px;font-weight:700;color:var(--green)">🤖 Análise da Conversa</div>
+          <span style="font-size:10px;color:var(--t3)">${new Date().toLocaleString('pt-BR')}</span>
+        </div>
+        <div style="font-size:13px;line-height:1.85;color:var(--t1)">${
+          analise
+            .replace(/\*\*(.*?)\*\*/g,'<strong style="color:var(--gold)">$1</strong>')
+            .replace(/\n/g,'<br>')
+        }</div>
+        <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--bd);display:flex;gap:8px;flex-wrap:wrap">
+          <button onclick="navigator.clipboard?.writeText(document.getElementById('wa-conversa').value);toast('✅ Conversa copiada!')"
+            style="padding:7px 12px;background:var(--s1);border:1px solid var(--bd);border-radius:8px;color:var(--t2);font-size:11px;cursor:pointer;font-family:var(--F)">
+            📋 Copiar análise
+          </button>
+          ${cliNome?`<button onclick="adicionarEventoConversa('${cliNome}')"
+            style="padding:7px 12px;background:rgba(0,196,140,.1);border:1px solid rgba(0,196,140,.25);border-radius:8px;color:var(--green);font-size:11px;cursor:pointer;font-family:var(--F)">
+            📝 Salvar no histórico de ${cliNome}
+          </button>`:''}
+        </div>
+      </div>`;
+  }catch(err){
+    if(res) res.innerHTML=`<div style="color:var(--red);padding:12px;text-align:center">❌ ${err.message}</div>`;
+  }
+}
+
+function adicionarEventoConversa(cliente){
+  const conversa=($('wa-conversa')?.value||'').trim();
+  if(!conversa||!cliente) return;
+  adicionarEvento(cliente,'wa','Conversa WhatsApp analisada pela IA','💬');
+  autoSave();
+  toast(`✅ Conversa registrada no histórico de ${cliente}!`);
+}
+
+// Popula select de clientes na aba inteligência
+function rInteligenciaSelect(){
+  const sel=$('wa-anal-cli');
+  if(!sel) return;
+  sel.innerHTML='<option value="">— Selecione se já é cliente —</option>'
+    +DB.empresas.map(e=>`<option value="${e.nome}">${e.nome}</option>`).join('');
+}
+
+
+function registrarCompraRapida(cliente,produto,categoria){
+  if(!DB.comprasClientes) DB.comprasClientes={};
+  if(!DB.comprasClientes[cliente]) DB.comprasClientes[cliente]=[];
+  DB.comprasClientes[cliente].push({produto,icone:categoria.split(' ')[0]||'🛍️',data:new Date().toLocaleDateString('pt-BR'),ts:Date.now(),desc:'Via análise IA'});
+  adicionarEvento(cliente,'compra',`Serviço registrado: ${produto}`,'🛍️');
+  autoSave();
+  toast(`✅ "${produto}" adicionado ao histórico!`);
+}
 
 async function analisarManutencaoIA(){
   if(!_apiKey){
