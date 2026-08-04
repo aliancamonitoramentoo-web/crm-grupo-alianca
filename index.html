@@ -523,7 +523,7 @@ tr:hover td{background:rgba(255,255,255,.017);}
         <div class="fb" onclick="filtrarOS(this,'pr')">Abertas</div>
         <div class="fb" onclick="filtrarOS(this,'vt')">Em Andamento</div>
         <div class="fb" onclick="filtrarOS(this,'at')">Concluídas</div>
-        <button class="btn bg sm adm" style="margin-left:auto" onclick="M.open('os')">+ Nova OS</button>
+        <button class="btn bg sm adm" style="margin-left:auto" onclick="abrirNovaOS()">+ Nova OS</button>
       </div>
       <div class="g3" id="os-grid"></div>
     </div>
@@ -2229,7 +2229,47 @@ function concluirOSComObs(id){
   toast(`✅ ${o.tipo} confirmado! OS ${o.oid} concluída.`);
 }
 
-function abrirFichaOS(id){
+function abrirNovaOS(){
+  _mtype='os';
+  $('mod-title').innerHTML='🔧 Nova OS / Atendimento';
+  $('mod-body').innerHTML=MFRM['os']||'';
+
+  // Popula selects
+  const tipos=DB.adminCfg?.osTipos?.length?DB.adminCfg.osTipos:['Instalação','Manutenção','Visita','Vistoria','Entrega','Suporte','Reunião','Outro'];
+  const empOpts='<option value="">— Selecione o cliente —</option>'+DB.empresas.map(e=>`<option>${e.nome}</option>`).join('');
+
+  const f0=$('f0'); if(f0) f0.innerHTML=tipos.map(t=>`<option>${t}</option>`).join('');
+  const f1=$('f1'); if(f1) f1.innerHTML=empOpts;
+
+  // Popula técnicos
+  const tecCont=$('os-tec-checks');
+  if(tecCont) tecCont.innerHTML=DB.tecnicos.map(t=>{
+    const nome=typeof t==='string'?t:t.nome;
+    const sal=typeof t==='object'?t.salario||t.diaria||0:0;
+    return `<label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:4px 0">
+      <input type="checkbox" id="tec-chk-${nome}" value="${nome}" data-sal="${sal}">
+      ${nome}${sal?` (R$${sal}/mês)`:''}
+    </label>`;
+  }).join('');
+
+  // Data padrão = agora
+  const f3=$('f3'); if(f3&&!f3.value){
+    const now=new Date(); now.setMinutes(Math.round(now.getMinutes()/15)*15,0,0);
+    f3.value=now.toISOString().slice(0,16);
+  }
+
+  // Configura botão Salvar
+  const btn=$('mod-save-btn');
+  if(btn){
+    btn.style.display='';
+    btn.textContent='💾 Salvar OS';
+    btn.style.cssText='background:#f5a623;color:#000;font-weight:800;font-size:13px;padding:10px;border:none;border-radius:8px;cursor:pointer;width:100%;font-family:var(--F)';
+    btn.onclick=()=>M.save();
+  }
+  $('MOD').classList.add('open');
+}
+
+
   const o=DB.os.find(x=>x.id===id); if(!o) return;
   const adm=isAdmin();
   const emp=DB.empresas.find(e=>e.nome===o.cli)||{};
@@ -2354,7 +2394,6 @@ function abrirFichaOS(id){
       $('MOD').onclick=null; $('MOD').classList.remove('open');
     }
   };
-}
 
 function gerarPDFOS(id){
   const o=DB.os.find(x=>x.id===id); if(!o){toast('OS não encontrada!');return;}
@@ -6553,7 +6592,7 @@ function rHistAcoes(cliente){
     ${telCli?`<button class="btn" style="background:#25d366;color:#000;font-weight:800;justify-content:center" onclick="window.open('https://wa.me/55${telCli}','_blank')">💬 Abrir WhatsApp</button>`:''}
     ${emailCli?`<button class="btn bb" onclick="$('email-para-sel').value='${emailCli}';go('email',document.querySelector('.ni[data-p=email]'))" style="justify-content:center">📧 Enviar E-mail</button>`:''}
     <button class="btn bgh" onclick="addEquipamento('${cliente}')" style="justify-content:center">📦 Registrar Equipamento</button>
-    <button class="btn bgh" onclick="M.open('os')" style="justify-content:center">🔧 Criar OS</button>
+    <button class="btn bgh" onclick="abrirNovaOS()" style="justify-content:center">🔧 Criar OS</button>
   </div>`;
 }
 
