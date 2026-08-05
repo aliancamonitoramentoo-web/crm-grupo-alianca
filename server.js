@@ -6,75 +6,73 @@ const app     = express();
 const PORT    = process.env.PORT || 3000;
 
 app.use(express.json({limit:'10mb'}));
+
+// Log de acesso para debug
+app.use((req,res,next)=>{
+  console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
+  next();
+});
+
+// Serve arquivos estáticos
 app.use(express.static(path.join(__dirname)));
 
-// ── Endpoint seguro da chave IA ──────────────────
-// A chave fica APENAS no Render como variável de ambiente
-// Nunca vai para o GitHub
+// Endpoint de saúde — testa se o servidor está funcionando
+app.get('/ping', (req,res)=>res.json({ok:true, time:new Date().toISOString()}));
+
+// Chave da IA
 app.get('/api/key', (req,res)=>{
   const key = process.env.ANTHROPIC_KEY || '';
-  if(!key) return res.json({ok:false, msg:'Chave não configurada no servidor'});
+  if(!key) return res.json({ok:false, msg:'Chave não configurada'});
   res.json({ok:true, key});
 });
 
-// ── Proxy seguro para Anthropic API ──────────────
-// O HTML chama /api/claude e o servidor faz a chamada real
-// A chave NUNCA aparece no navegador do cliente
-app.post('/api/claude', async (req,res)=>{
+// Proxy para Anthropic
+app.post('/api/claude', (req,res)=>{
   const key = process.env.ANTHROPIC_KEY || '';
-  if(!key) return res.status(500).json({error:'Chave de IA não configurada no servidor'});
+  if(!key) return res.status(500).json({error:'ANTHROPIC_KEY não configurada'});
 
   const body = JSON.stringify(req.body);
-  const options = {
-    hostname: 'api.anthropic.com',
-    path: '/v1/messages',
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': key,
-      'anthropic-version': '2023-06-01',
-      'Content-Length': Buffer.byteLength(body)
+  const opts = {
+    hostname:'api.anthropic.com', path:'/v1/messages', method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'x-api-key':key,
+      'anthropic-version':'2023-06-01',
+      'Content-Length':Buffer.byteLength(body)
     }
   };
-
-  const apiReq = https.request(options, apiRes => {
-    let data = '';
-    apiRes.on('data', chunk => data += chunk);
-    apiRes.on('end', () => {
-      try {
-        res.status(apiRes.statusCode).json(JSON.parse(data));
-      } catch(e) {
-        res.status(500).json({error: 'Erro ao processar resposta da IA'});
-      }
+  const r=https.request(opts, ar=>{
+    let d='';
+    ar.on('data',c=>d+=c);
+    ar.on('end',()=>{
+      try{ res.status(ar.statusCode).json(JSON.parse(d)); }
+      catch(e){ res.status(500).json({error:'Erro ao processar resposta'}); }
     });
   });
-
-  apiReq.on('error', e => {
-    res.status(500).json({error: e.message});
-  });
-
-  apiReq.write(body);
-  apiReq.end();
+  r.on('error',e=>res.status(500).json({error:e.message}));
+  r.write(body); r.end();
 });
 
-// ── Sincronização ─────────────────────────────────
-const DATA_FILE = path.join('/tmp', 'crm_data.json');
-
-app.get('/sync', (req,res)=>{
+// Sync local
+const DATA_FILE = '/tmp/crm_data.json';
+app.get('/sync',(req,res)=>{
   try{
-    if(fs.existsSync(DATA_FILE)) return res.json({ok:true, data:JSON.parse(fs.readFileSync(DATA_FILE,'utf8'))});
+    if(fs.existsSync(DATA_FILE)) return res.json({ok:true,data:JSON.parse(fs.readFileSync(DATA_FILE,'utf8'))});
   }catch(e){}
-  res.json({ok:false, empty:true});
+  res.json({ok:false,empty:true});
+});
+app.post('/sync',(req,res)=>{
+  try{ fs.writeFileSync(DATA_FILE,JSON.stringify(req.body),'utf8'); res.json({ok:true}); }
+  catch(e){ res.status(500).json({ok:false}); }
 });
 
-app.post('/sync', (req,res)=>{
-  try{
-    fs.writeFileSync(DATA_FILE, JSON.stringify(req.body), 'utf8');
-    res.json({ok:true});
-  }catch(e){
-    res.status(500).json({ok:false});
+// Sempre serve o index.html
+app.get('*',(req,res)=>{
+  const file=path.join(__dirname,'index.html');
+  if(!fs.existsSync(file)){
+    return res.status(404).send('index.html não encontrado no servidor');
   }
+  res.sendFile(file);
 });
 
-app.get('*', (req,res) => res.sendFile(path.join(__dirname,'index.html')));
-app.listen(PORT, () => console.log('CRM Alianca porta '+PORT));
+app.listen(PORT,()=>console.log(`CRM Alianca rodando na porta ${PORT}`));
