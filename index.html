@@ -1410,34 +1410,26 @@ async function login(){
   $('le').textContent='';
   if(!u||!p){$('le').textContent='Preencha usuário e senha.';return;}
 
-  // Tenta via API se backend configurado
-  if(API_URL){
-    try {
-      const data = await api('POST','/login',{login:u,senha:p});
-      setToken(data.token);
-      CU={...data.usuario};
-      if(!USERS.find(x=>x.id===CU.id)) USERS.push({id:CU.id,nome:CU.nome,login:CU.login,senha:'',perfil:CU.perfil,cor:CU.cor,ini:CU.ini});
-      $('LS').style.display='none'; $('APP').classList.add('show');
-      applyProfile(); initApp(); return;
-    } catch(e){
-      // Se deu 404 ou erro de conexão, limpa API_URL e usa modo local
-      const msg = e.message||'';
-      if(msg.includes('404')||msg.includes('Failed to fetch')||msg.includes('NetworkError')||msg.includes('não configurada')){
-        // Backend não disponível — usa modo local automaticamente
-        API_URL=''; localStorage.removeItem('alianca_api_url'); modoBackend=false;
-        // Continua para modo local abaixo
-      } else {
-        $('le').textContent=msg||'Erro ao conectar ao servidor'; return;
-      }
-    }
-  }
-
-  // Modo local
+  // Carrega dados locais (incluindo usuários salvos)
   carregarLocal();
+
+  // Carrega usuários salvos do localStorage
+  try{
+    const saved=localStorage.getItem('alianca_users');
+    if(saved){
+      const arr=JSON.parse(saved);
+      arr.forEach(su=>{ if(!USERS.find(x=>x.id===su.id)) USERS.push(su); });
+    }
+  }catch(e){}
+
+  // Busca usuário
   const f=USERS.find(x=>x.login===u&&x.senha===p);
   if(!f){$('le').textContent='Usuário ou senha incorretos.';return;}
-  CU=f; $('LS').style.display='none'; $('APP').classList.add('show');
-  applyProfile(); initApp();
+  CU=f;
+  $('LS').style.display='none';
+  $('APP').classList.add('show');
+  applyProfile();
+  initApp();
 }
 function logout(){
   clearToken(); CU=null;
