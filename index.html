@@ -2269,7 +2269,7 @@ function abrirNovaOS(){
   },100);
 }
 
-
+function abrirFichaOS(id){
   const o=DB.os.find(x=>x.id===id); if(!o) return;
   const adm=isAdmin();
   const emp=DB.empresas.find(e=>e.nome===o.cli)||{};
@@ -2394,6 +2394,8 @@ function abrirNovaOS(){
       $('MOD').onclick=null; $('MOD').classList.remove('open');
     }
   };
+
+}
 
 // ═══════════════════════════════════════════════════
 //  📄 GERADOR DE CONTRATOS — Manutenção / Monitoramento
@@ -10380,7 +10382,6 @@ function initApp(){
   // Verifica lembretes a cada hora
   setInterval(gerarLembretes, 3600000);
 }
-
 </script>
 
 <!-- ████ SETUP WIZARD — Configuração Inicial ████ -->
