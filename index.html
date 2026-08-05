@@ -1817,8 +1817,8 @@ function moverParaFunil(id){
   rPipeline(); updKPI(); autoSave();
   toast(`↩ ${d.emp} voltou para o funil!`);
 }
-function editDeal(id,f,v){const d=DB.deals.find(x=>x.id===id);if(d){d[f]=v.trim();}}
-function editDealVal(id,v){const d=DB.deals.find(x=>x.id===id);if(d){d.val=String(parseR(v));updKPI();}}
+function editDeal(id,f,v){const d=DB.deals.find(x=>x.id===id);if(d){d[f]=v.trim();autoSave();}}
+function editDealVal(id,v){const d=DB.deals.find(x=>x.id===id);if(d){d.val=String(parseR(v));updKPI();autoSave();}}
 function delDeal(id){
   // Colaboradores não podem nem remover
   if(!isAdmin()){toast('⛔ Apenas administradores podem cancelar vendas!');return;}
@@ -3051,9 +3051,20 @@ function editarCobranca(id){
 
 function delCobranca(id){
   if(!confirm('Remover cobrança?'))return;
+  const c=DB.cobrancas?.find(x=>x.id===id);
+  // Se já estava paga, estorna o valor lançado no Financeiro antes de excluir
+  if(c&&c.pago){
+    DB.movs.unshift({
+      id:uid(),
+      tipo:'estorno',
+      val:String(parseR(c.valor)),
+      desc:`🚫 Estorno — Cobrança excluída (${c.cliente||'—'})`,
+      ref:`Exclusão de cobrança · ${new Date().toLocaleString('pt-BR')}`
+    });
+  }
   registrarDelecao(id);
   DB.cobrancas=DB.cobrancas?.filter(x=>x.id!==id)||[];
-  rCobrancas();autoSave();toast('Cobrança removida!');
+  rCobrancas();rFinanceiro();updKPI();autoSave();toast('Cobrança removida!');
 }
 
 
