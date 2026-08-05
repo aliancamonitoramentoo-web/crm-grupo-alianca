@@ -3706,7 +3706,7 @@ const MFRM={
 
   os:`<div class="fg2">
     <div class="fg"><label>Tipo de Serviço *</label>
-      <select class="fc" id="f0" id="os-tipo-sel"></select>
+      <select class="fc" id="f0"></select>
     </div>
     <div class="fg"><label>Cliente *</label>
       <select class="fc" id="f1" onchange="preencherEnderecoOS(this.value)"></select>
@@ -3867,7 +3867,14 @@ const M={
   },
   close(){
     $('MOD').classList.remove('open');
-    const btn=$('mod-save-btn'); if(btn) btn.style.display='';
+    const btn=$('mod-save-btn');
+    if(btn){
+      btn.style.display='';
+      btn.textContent='💾 Salvar';
+      btn.style.background='';
+      btn.style.color='';
+      btn.onclick=()=>M.save();
+    }
   },
   save(){
     if(!isAdmin()&&!['agenda','contato','cliente'].includes(_mtype)){toast('⛔ Sem permissão!');return;}
