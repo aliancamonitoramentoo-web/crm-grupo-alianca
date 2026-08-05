@@ -285,7 +285,7 @@ tr:hover td{background:rgba(255,255,255,.017);}
 .nav-group .ni:hover{border-left-color:rgba(245,166,35,.5);}
 .nav-group .ni.on{border-left-color:var(--gold);}
 /* adm: oculta por padrão exceto nav-group (controlado por open/close) */
-.adm:not(.nav-group){display:none;}
+body:not(.is-admin) .adm:not(.nav-group){display:none;}
 </style>
 </head>
 <body>
@@ -1482,6 +1482,7 @@ async function getBDFromSupabase(){
 function applyProfile(){
   if(!CU)return;
   const adm=isAdmin();
+  document.body.classList.toggle('is-admin', adm);
   $('sav').textContent=CU.ini;$('sav').style.background=CU.cor;
   $('snm').textContent=CU.nome;
   $('srl').textContent=adm?'Sócio Administrador':'Colaborador';
