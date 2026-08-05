@@ -9927,7 +9927,7 @@ function abrirGerarContrato(){
     <div class="fg2">
       <div class="fg">
         <label>Nº do Contrato</label>
-        <input class="fc" id="ctr-num" placeholder="Ex: 001" value="${String(DB.contratos.length+1).padStart(3,'0')}">
+        <input class="fc" id="ctr-num" placeholder="Ex: 002" value="${String(200+DB.contratos.length+1)}">
       </div>
       <div class="fg">
         <label>Ano</label>
@@ -10081,7 +10081,7 @@ function gerarContratoGrupoAlianca(){
   if(!valorMensal){toast('⚠️ Informe o valor mensal!');return;}
 
   const isMan=tipo==='manutencao';
-  const numContrato=($('ctr-num')?.value||'001').padStart(3,'0');
+  const numContrato=($('ctr-num')?.value||'202');
   const anoContrato=$('ctr-ano')?.value||new Date().getFullYear();
   const vigencia=parseInt($('ctr-vigencia')?.value||'12');
   const vencDia=$('ctr-vencdia')?.value||'10';
@@ -10152,7 +10152,7 @@ body{font-family:Arial,sans-serif;font-size:11.5px;color:#111;background:#fff}
   <strong>CONTRATADA:</strong> GRUPO ALIANÇA MONITORAMENTO, pessoa jurídica de direito privado, com sede na Rua Teonilio Silvestre, nº 584, Centro, Santa Cruz do Capibaribe – PE, doravante denominada simplesmente CONTRATADA.
 </div>
 <div class="clausula">
-  <strong>CONTRATANTE:</strong> ${e.nome}, ${tipoPessoa}${e.doc?`, portador(a) do CPF/CNPJ nº ${e.doc}`:', portador(a) do CPF/CNPJ nº ___________________________'}, residente/com sede em ${enderecoCliente}${e.cidade?'':', ___________________________'}, CEP: ________________, doravante denominado(a) simplesmente CONTRATANTE.
+  <strong>CONTRATANTE:</strong> ${e.nome}, ${tipoPessoa}${e.doc?`, portador(a) do CPF/CNPJ nº ${e.doc}`:', portador(a) do CPF/CNPJ nº ___________________________'}, residente/com sede em ${enderecoCliente||'___________________________'}, doravante denominado(a) simplesmente CONTRATANTE.
 </div>
 
 <div class="clausula-titulo">Cláusula II – Do Objeto</div>
@@ -10241,22 +10241,8 @@ body{font-family:Arial,sans-serif;font-size:11.5px;color:#111;background:#fff}
   <div class="ass-box">
     <div class="ass-linha"></div>
     <div class="ass-nome">GRUPO ALIANÇA MONITORAMENTO</div>
-    <div class="ass-sub">CONTRATADA</div>
-  </div>
-</div>
-
-<div class="test-grid">
-  <div class="test-box">
-    <div class="test-linha"></div>
-    <div style="font-size:10px;font-weight:700">TESTEMUNHA 1</div>
-    <div style="font-size:10px;color:#555">Nome: ___________________________</div>
-    <div style="font-size:10px;color:#555">CPF: ___________________________</div>
-  </div>
-  <div class="test-box">
-    <div class="test-linha"></div>
-    <div style="font-size:10px;font-weight:700">TESTEMUNHA 2</div>
-    <div style="font-size:10px;color:#555">Nome: ___________________________</div>
-    <div style="font-size:10px;color:#555">CPF: ___________________________</div>
+    <div class="ass-sub">João Hinô da Silva Filho</div>
+    <div class="ass-sub">Representante Legal — CONTRATADA</div>
   </div>
 </div>
 
