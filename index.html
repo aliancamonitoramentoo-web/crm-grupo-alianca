@@ -1113,6 +1113,10 @@ Cliente: Nenhuma ainda, quero instalar..."></textarea>
 //  ALIANCE CRM — v1.0
 // ═══════════════════════════════════════════
 
+// ── SUPABASE — declarado no topo para acesso global ──
+const _SB_URL = 'https://yiauzqmjuejxkdezurtu.supabase.co';
+const _SB_KEY = 'sb_publishable_lQ_JxlJ92yZNuujGmJXzfg_tXsKs79c';
+
 // ── USUÁRIOS ─────────────────────────────
 const USERS=[
   {id:1,nome:'Hino',   login:'hino',   senha:'alianca@123',perfil:'admin', cor:'#f5a623',ini:'HI'},
@@ -3209,7 +3213,7 @@ function rEquipe(){
           </div>
           <div>
             <div style="font-size:10px;color:var(--t3)">Custo Mensal</div>
-            <div style="font-size:14px;font-weight:800;color:var(--red)">${fmtR(custoMes)}</div>
+            <div style="font-size:14px;font-weight:800;color:var(--red)">${fmtR(sal)}</div>
           </div>
           <div>
             <div style="font-size:10px;color:var(--t3)">Custo/Dia Útil</div>
@@ -7076,8 +7080,6 @@ function atualizarStatusJB(){
 
 // ── Recebe dados do JSONBin ───────────────────────
 // ── Supabase — Sincronização permanente ──────────
-const _SB_URL = 'https://yiauzqmjuejxkdezurtu.supabase.co';
-const _SB_KEY = 'sb_publishable_lQ_JxlJ92yZNuujGmJXzfg_tXsKs79c';
 
 async function jbEnviar(manual=false){
   try {
