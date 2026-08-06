@@ -6167,7 +6167,7 @@ function rPropostas(){
           <button class="btn bgr sm" onclick="enviarPropostaWA(${i})">💬 WA</button>
           <button class="btn bb sm" onclick="enviarPropostaEmail(${i})">📧 E-mail</button>
           <button class="btn bgh sm adm" onclick="editarProposta(${i})">✏️</button>
-          ${p.status==='enviada'?`<button class="btn bgr sm" onclick="aprovarProposta(${i})">✓ Aprovar</button><button class="btn br sm" onclick="rejeitarProposta(${i})">❌ Rejeitar</button>`:''}
+          ${(p.status==='enviada'||p.status==='rascunho')?`<button class="btn bgr sm" onclick="aprovarProposta(${i})">✓ Aprovar</button><button class="btn br sm" onclick="rejeitarProposta(${i})">❌ Rejeitar</button>`:''}
           <button class="btn br sm adm" onclick="delProposta(${i})">🗑️</button>
         </div>
       </div>
