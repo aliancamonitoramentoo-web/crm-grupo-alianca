@@ -5468,7 +5468,7 @@ async function carregarTodosDados(){
     toast('✅ Dados carregados do servidor!');
   } catch(e){
     console.error('Erro ao carregar dados:', e);
-    toast('⚠️ Erro no servidor. Usando dados locais.','⚠️');
+    console.warn('Supabase indisponível:', e.message);
     carregarLocal();
   }
 }
@@ -10417,6 +10417,12 @@ function initApp(){
 
   // Verifica lembretes a cada hora
   setInterval(gerarLembretes, 3600000);
+
+  // ── Ping automático — mantém o servidor acordado (evita "dormir" no Render free) ──
+  // Envia ping a cada 8 minutos — Render dorme após 15 min sem acesso
+  setInterval(()=>{
+    fetch('/ping').catch(()=>{}); // silencioso — só acorda o servidor
+  }, 8 * 60 * 1000);
 }
 </script>
 
