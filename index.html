@@ -6167,7 +6167,7 @@ function rPropostas(){
           <button class="btn bgr sm" onclick="enviarPropostaWA(${i})">💬 WA</button>
           <button class="btn bb sm" onclick="enviarPropostaEmail(${i})">📧 E-mail</button>
           <button class="btn bgh sm adm" onclick="editarProposta(${i})">✏️</button>
-          ${p.status==='enviada'?`<button class="btn bgr sm" onclick="DB.propostas[${i}].status='aprovada';rPropostas();autoSave();toast('✅ Proposta aprovada!')">✓ Aprovar</button>`:''}
+          ${p.status==='enviada'?`<button class="btn bgr sm" onclick="DB.propostas[${i}].status='aprovada';rPropostas();autoSave();toast('✅ Proposta aprovada!')">✓ Aprovar</button><button class="btn br sm" onclick="rejeitarProposta(${i})">❌ Rejeitar</button>`:''}
           <button class="btn br sm adm" onclick="delProposta(${i})">🗑️</button>
         </div>
       </div>
@@ -6214,6 +6214,12 @@ function novaPropostaModal(idx){
   $('MOD').classList.add('open');
 }
 function editarProposta(i){ novaPropostaModal(i); }
+function rejeitarProposta(i){
+  if(!confirm('Marcar proposta como REJEITADA?')) return;
+  DB.propostas[i].status='rejeitada';
+  adicionarEvento(DB.propostas[i].cliente,'proposta',`Proposta rejeitada: ${DB.propostas[i].titulo}`,'❌');
+  rPropostas(); autoSave(); toast('❌ Proposta marcada como rejeitada.');
+}
 function delProposta(i){ if(!confirm('Remover proposta?')) return; DB.propostas.splice(i,1); rPropostas(); autoSave(); toast('Proposta removida!'); }
 
 let _prItens=[];
