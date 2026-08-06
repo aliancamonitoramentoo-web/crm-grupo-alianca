@@ -10065,7 +10065,11 @@ function abrirGerarContrato(){
 
     <button onclick="gerarContratoGrupoAlianca()" style="width:100%;margin-top:12px;padding:12px;background:#c00;border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--F)">
       📄 Gerar Contrato
-    </button>`;
+    </button>
+    <div class="fg" style="margin-top:10px">
+      <label>Nome do Sócio / CMO (para 2ª assinatura)</label>
+      <input class="fc" id="ctr-cmo" placeholder="Ex: Nivaldo Santos" value="${DB.tecnicos?.find?.(t=>(t.nome||t).includes('Nivaldo'))?(typeof DB.tecnicos.find(t=>(t.nome||t).includes('Nivaldo'))==='string'?DB.tecnicos.find(t=>(t.nome||t).includes('Nivaldo')):DB.tecnicos.find(t=>(t.nome||t).includes('Nivaldo')).nome):'Nivaldo'}">
+    </div>`;
 
   const btn=$('mod-save-btn');if(btn)btn.style.display='none';
   $('MOD').classList.add('open');
@@ -10131,6 +10135,7 @@ function gerarContratoGrupoAlianca(){
   const isMan=tipo==='manutencao';
   const numContrato=($('ctr-num')?.value||'202');
   const anoContrato=$('ctr-ano')?.value||new Date().getFullYear();
+  const cmoNome=($('ctr-cmo')?.value||'').trim()||'Sócio';
   const vigencia=parseInt($('ctr-vigencia')?.value||'12');
   const vencDia=$('ctr-vencdia')?.value||'10';
   const dataInicio=parseDateLocal($('ctr-inicio')?.value||new Date().toISOString().slice(0,10));
@@ -10290,8 +10295,17 @@ body{font-family:Arial,sans-serif;font-size:11.5px;color:#111;background:#fff}
     <div class="ass-linha"></div>
     <div class="ass-nome">GRUPO ALIANÇA MONITORAMENTO</div>
     <div class="ass-sub">João Hinô da Silva Filho</div>
-    <div class="ass-sub">Representante Legal — CONTRATADA</div>
+    <div class="ass-sub">CEO — Representante Legal</div>
   </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:50px;margin-top:28px;padding-top:20px;border-top:1px solid #ddd">
+  <div style="text-align:center">
+    <div style="border-bottom:1.5px solid #111;height:44px;margin-bottom:8px"></div>
+    <div style="font-size:11px;font-weight:700">${cmoNome}</div>
+    <div style="font-size:10px;color:#555">CMO — Grupo Aliança Monitoramento</div>
+  </div>
+  <div></div>
 </div>
 
 <div class="rodape">Grupo Aliança Monitoramento · Contrato Nº ${numContrato}/${anoContrato} · ${dataExtenso}</div>
