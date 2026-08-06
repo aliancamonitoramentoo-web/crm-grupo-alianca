@@ -6167,7 +6167,7 @@ function rPropostas(){
           <button class="btn bgr sm" onclick="enviarPropostaWA(${i})">💬 WA</button>
           <button class="btn bb sm" onclick="enviarPropostaEmail(${i})">📧 E-mail</button>
           <button class="btn bgh sm adm" onclick="editarProposta(${i})">✏️</button>
-          ${p.status==='enviada'?`<button class="btn bgr sm" onclick="DB.propostas[${i}].status='aprovada';rPropostas();autoSave();toast('✅ Proposta aprovada!')">✓ Aprovar</button><button class="btn br sm" onclick="rejeitarProposta(${i})">❌ Rejeitar</button>`:''}
+          ${p.status==='enviada'?`<button class="btn bgr sm" onclick="aprovarProposta(${i})">✓ Aprovar</button><button class="btn br sm" onclick="rejeitarProposta(${i})">❌ Rejeitar</button>`:''}
           <button class="btn br sm adm" onclick="delProposta(${i})">🗑️</button>
         </div>
       </div>
@@ -6214,6 +6214,48 @@ function novaPropostaModal(idx){
   $('MOD').classList.add('open');
 }
 function editarProposta(i){ novaPropostaModal(i); }
+function aprovarProposta(i){
+  const p=DB.propostas[i]; if(!p) return;
+  p.status='aprovada';
+  p.aprovadoEm=new Date().toLocaleString('pt-BR');
+
+  const total=p.itens.reduce((a,it)=>a+(it.qtd*it.preco),0);
+  const desc=p.desconto||0;
+  const totalFinal=Math.round(total*(1-desc/100));
+
+  // 1. Lança no Pipeline como FECHADO (último estágio)
+  const corDeal=DB.empresas.find(e=>e.nome===p.cliente)?.cor||avc(DB.deals.length);
+  const deal={
+    id:uid(), emp:p.cliente, val:String(totalFinal),
+    tag:'sv', stage:DB.stages.length-1,
+    ini:(CU?.nome||'GA').substring(0,2).toUpperCase(),
+    cor:corDeal, lancado:true
+  };
+  DB.deals.push(deal);
+
+  // 2. Lança no Financeiro como entrada
+  DB.movs.unshift({
+    id:uid(), tipo:'in',
+    val:String(totalFinal),
+    desc:`✅ Proposta aprovada — ${p.cliente}: ${p.titulo}`,
+    ref:`Proposta aprovada em ${new Date().toLocaleDateString('pt-BR')}`
+  });
+
+  // 3. Registra histórico e feed
+  adicionarEvento(p.cliente,'venda',`Proposta aprovada: ${p.titulo} — ${fmtR(totalFinal)}`,'✅');
+  addFeed('✅','rgba(0,217,126,.12)',`Proposta aprovada: ${p.cliente} — ${fmtR(totalFinal)}`);
+  DB.notifs.unshift({ic:'🏆',t:`Proposta aprovada: ${p.cliente}`,sub:`${p.titulo} — ${fmtR(totalFinal)}`,time:nowStr(),tipo:'success'});
+
+  // 4. Atualiza tudo
+  rPropostas(); rPipeline(); rFinanceiro(); rNotifs(); updKPI(); autoSave();
+
+  // Destrói e recria gráficos
+  ['ch-rec','ch-fin','ch-ano'].forEach(k=>{if(charts[k]){charts[k].destroy();delete charts[k];}});
+  setTimeout(initCharts,100);
+
+  toast(`🏆 Proposta aprovada! ${fmtR(totalFinal)} lançado no Pipeline e no Financeiro!`);
+}
+
 function rejeitarProposta(i){
   if(!confirm('Marcar proposta como REJEITADA?')) return;
   DB.propostas[i].status='rejeitada';
