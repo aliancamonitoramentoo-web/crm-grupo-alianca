@@ -546,6 +546,7 @@ tr:hover td{background:rgba(255,255,255,.017);}
   <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
     <div class="srch" style="max-width:290px"><span style="color:var(--t3)">🔍</span><input type="text" placeholder="Buscar..." id="srch-cont2" oninput="filterCont2()"></div>
     <button class="btn bgh sm adm" onclick="abrirGerarContrato()">📄 Gerar Contrato PDF</button>
+    <button class="btn bgh sm adm" onclick="abrirComprovanteInterno()" style="color:var(--purple);border-color:rgba(176,143,255,.3)">📋 Comprovante Interno</button>
     <button class="btn bg sm adm" style="margin-left:auto" onclick="M.open('contrato')">+ Novo Contrato</button>
   </div>
   <div class="card"><table><thead><tr><th>#</th><th>Cliente</th><th>Serviço</th><th>Valor/mês</th><th>Início</th><th>Vencimento</th><th>Status</th><th>Ações</th></tr></thead><tbody id="cont-table"></tbody></table></div>
@@ -9933,6 +9934,215 @@ function removerSegmento(val, tagEl){
 //  📄 GERADOR DE CONTRATOS — GRUPO ALIANÇA
 //  Baseado no modelo oficial da empresa
 // ═══════════════════════════════════════════════════
+
+function abrirComprovanteInterno(){
+  if(!DB.contratos.length){toast('⚠️ Nenhum contrato cadastrado!');return;}
+
+  const empOpts='<option value="">— Selecione o contrato —</option>'
+    +DB.contratos.map(c=>`<option value="${c.id}">${c.cli} — ${c.srv} (${fmtR(c.val)}/mês)</option>`).join('');
+
+  $('mod-title').innerHTML='📋 Comprovante Interno de Execução';
+  $('mod-body').innerHTML=`
+    <div style="background:rgba(176,143,255,.08);border:1px solid rgba(176,143,255,.2);border-radius:9px;padding:11px;margin-bottom:12px;font-size:12px;color:var(--t2)">
+      📋 Documento interno entre os sócios confirmando que o serviço do cliente foi executado.
+    </div>
+    <div class="fg">
+      <label>Contrato do Cliente *</label>
+      <select class="fc" id="ci-contrato" onchange="preencherDadosCI(this.value)">
+        ${empOpts}
+      </select>
+    </div>
+    <div id="ci-dados" style="display:none;background:rgba(0,217,126,.06);border:1px solid rgba(0,217,126,.2);border-radius:9px;padding:11px;margin-bottom:10px;font-size:11px">
+      <div style="font-weight:700;color:var(--green);margin-bottom:6px">✅ Dados do Contrato</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
+        <div>Cliente: <strong id="ci-cli">—</strong></div>
+        <div>Serviço: <strong id="ci-srv">—</strong></div>
+        <div>Valor: <strong id="ci-val">—</strong></div>
+        <div>Início: <strong id="ci-ini">—</strong></div>
+      </div>
+    </div>
+    <div class="fg">
+      <label>Data de Execução</label>
+      <input class="fc" id="ci-data" type="date" value="${new Date().toISOString().slice(0,10)}">
+    </div>
+    <div class="fg">
+      <label>Descrição do Serviço Executado</label>
+      <textarea class="fc" id="ci-desc" rows="3" placeholder="Ex: Instalação de 4 câmeras IP Full HD, DVR 8 canais, acesso remoto configurado via app..."></textarea>
+    </div>
+    <div class="fg">
+      <label>Técnico(s) Responsável(is)</label>
+      <input class="fc" id="ci-tec" placeholder="Ex: Dayvson, Ruan" list="ci-tec-list">
+      <datalist id="ci-tec-list">
+        ${DB.tecnicos.map(t=>`<option value="${typeof t==='string'?t:t.nome}">`).join('')}
+      </datalist>
+    </div>
+    <button onclick="gerarComprovanteInterno()" style="width:100%;padding:12px;background:var(--purple);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--F)">
+      📋 Gerar Comprovante
+    </button>`;
+
+  const btn=$('mod-save-btn');if(btn)btn.style.display='none';
+  $('MOD').classList.add('open');
+  $('MOD').onclick=ev=>{if(ev.target===$('MOD')){const b=$('mod-save-btn');if(b)b.style.display='';$('MOD').onclick=null;$('MOD').classList.remove('open');}};
+}
+
+function preencherDadosCI(id){
+  const c=DB.contratos.find(x=>x.id==id);
+  const box=$('ci-dados');
+  if(!c||!id){if(box)box.style.display='none';return;}
+  if(box)box.style.display='block';
+  if($('ci-cli'))$('ci-cli').textContent=c.cli;
+  if($('ci-srv'))$('ci-srv').textContent=c.srv;
+  if($('ci-val'))$('ci-val').textContent=fmtR(c.val)+'/mês';
+  if($('ci-ini'))$('ci-ini').textContent=c.ini||'—';
+  // Preenche descrição automática
+  const desc=$('ci-desc');
+  if(desc&&!desc.value) desc.value=`Execução do serviço de ${c.srv} para o cliente ${c.cli}, conforme contrato Nº ${c.cid}.`;
+}
+
+function gerarComprovanteInterno(){
+  const cid=$('ci-contrato')?.value;
+  const c=DB.contratos.find(x=>x.id==cid);
+  if(!c){toast('⚠️ Selecione o contrato!');return;}
+
+  const e=DB.empresas.find(x=>x.nome===c.cli)||{};
+  const dataExec=parseDateLocal($('ci-data')?.value||new Date().toISOString().slice(0,10));
+  const desc=($('ci-desc')?.value||'').trim()||`Execução do serviço de ${c.srv}`;
+  const tec=($('ci-tec')?.value||'').trim()||'—';
+  const mesesExtenso=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  const dataFmt=`${String(dataExec.getDate()).padStart(2,'0')} de ${mesesExtenso[dataExec.getMonth()]} de ${dataExec.getFullYear()}`;
+  const hoje=new Date();
+  const hojeExtenso=`${String(hoje.getDate()).padStart(2,'0')} de ${mesesExtenso[hoje.getMonth()]} de ${hoje.getFullYear()}`;
+  const endCli=[e.rua&&e.num?e.rua+', nº '+e.num:e.rua,e.bairro,e.cidade].filter(Boolean).join(', ')||'—';
+
+  const html=`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Comprovante Interno — ${c.cli}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Arial,sans-serif;font-size:12px;color:#111;background:#fff}
+@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.no-print{display:none}}
+.page{max-width:780px;margin:0 auto;padding:40px 50px}
+.header{text-align:center;border-bottom:3px solid #7b1fa2;padding-bottom:16px;margin-bottom:22px}
+.empresa-nome{font-size:16px;font-weight:700;color:#7b1fa2;text-transform:uppercase}
+.empresa-end{font-size:10px;color:#555;margin-top:3px}
+.titulo{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;margin:12px 0 4px;color:#111}
+.subtitulo{font-size:11px;color:#7b1fa2;font-weight:700;text-transform:uppercase;letter-spacing:1px}
+.num{font-size:10px;color:#888;margin-top:4px}
+.secao-titulo{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:16px 0 8px;border-bottom:1px solid #7b1fa2;padding-bottom:4px;color:#7b1fa2}
+.clausula{font-size:11.5px;line-height:1.75;text-align:justify;margin-bottom:8px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.campo{margin-bottom:6px}
+.campo-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888}
+.campo-valor{font-size:12px;font-weight:600;border-bottom:1px solid #ddd;padding:2px 0}
+.destaque{background:#f3e5f5;border:1.5px solid #7b1fa2;border-radius:8px;padding:12px 16px;margin:14px 0;text-align:center}
+.destaque-val{font-size:20px;font-weight:700;color:#7b1fa2}
+.ass-grid{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:40px}
+.ass-box{text-align:center}
+.ass-linha{border-bottom:1.5px solid #111;height:44px;margin-bottom:8px}
+.ass-nome{font-size:11px;font-weight:700}
+.ass-cargo{font-size:10px;color:#555}
+.rodape{margin-top:24px;padding-top:10px;border-top:1px solid #ddd;font-size:9px;color:#999;text-align:center}
+.btn-print{position:fixed;bottom:20px;right:20px;background:#7b1fa2;color:#fff;border:none;padding:11px 22px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(123,31,162,.3)}
+.uso-interno{display:inline-block;background:#7b1fa2;color:#fff;padding:3px 12px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-top:8px}
+</style>
+</head>
+<body>
+<button class="btn-print no-print" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
+<div class="page">
+
+<div class="header">
+  <div class="empresa-nome">Grupo Aliança Monitoramento</div>
+  <div class="empresa-end">Rua Teonilio Silvestre, 584 – Centro | Santa Cruz do Capibaribe – PE</div>
+  <div class="titulo">Comprovante Interno de Execução de Serviço</div>
+  <div class="subtitulo">Documento entre Sócios — Uso Interno</div>
+  <div class="uso-interno">🔒 Confidencial</div>
+  <div class="num">Ref. Contrato: ${c.cid} | Emitido em: ${hojeExtenso}</div>
+</div>
+
+<div class="secao-titulo">1. Identificação do Contrato e Cliente</div>
+<div class="grid2">
+  <div>
+    <div class="campo"><div class="campo-label">Cliente</div><div class="campo-valor"><strong>${c.cli}</strong></div></div>
+    <div class="campo"><div class="campo-label">CPF / CNPJ</div><div class="campo-valor">${e.doc||'Não informado'}</div></div>
+    <div class="campo"><div class="campo-label">Telefone</div><div class="campo-valor">${e.tel||'Não informado'}</div></div>
+  </div>
+  <div>
+    <div class="campo"><div class="campo-label">Nº do Contrato</div><div class="campo-valor">${c.cid}</div></div>
+    <div class="campo"><div class="campo-label">Serviço Contratado</div><div class="campo-valor">${c.srv}</div></div>
+    <div class="campo"><div class="campo-label">Endereço</div><div class="campo-valor">${endCli}</div></div>
+  </div>
+</div>
+
+<div class="secao-titulo">2. Detalhes da Execução</div>
+<div class="clausula">
+  Os abaixo assinados, sócios da <strong>Grupo Aliança Monitoramento</strong>, declaram que o serviço de <strong>${c.srv}</strong> foi devidamente executado para o cliente <strong>${c.cli}</strong>, na data de <strong>${dataFmt}</strong>, pelo(s) técnico(s) responsável(is): <strong>${tec}</strong>.
+</div>
+<div class="clausula">
+  <strong>Descrição do serviço executado:</strong><br>
+  ${desc}
+</div>
+
+<div class="destaque">
+  <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px">Valor Mensal do Contrato</div>
+  <div class="destaque-val">${fmtR(c.val)}<span style="font-size:12px;font-weight:400">/mês</span></div>
+  <div style="font-size:10px;color:#888;margin-top:4px">Vigência: ${c.ini||'—'} até ${c.venc||'—'}</div>
+</div>
+
+<div class="secao-titulo">3. Declaração dos Sócios</div>
+<div class="clausula">
+  Nós, sócios da <strong>Grupo Aliança Monitoramento</strong>, confirmamos que:
+</div>
+<div style="margin:8px 0 8px 16px;font-size:11.5px;line-height:1.8">
+  ✅ O serviço foi executado conforme contrato e acordado com o cliente;<br>
+  ✅ O cliente foi atendido com qualidade e profissionalismo;<br>
+  ✅ Os equipamentos/serviços estão em funcionamento e foram testados;<br>
+  ✅ O valor mensal de ${fmtR(c.val)} está autorizado e acordado entre os sócios;<br>
+  ✅ Este documento serve como comprovante interno de execução e aprovação dos sócios.
+</div>
+
+<div class="clausula" style="text-align:center;margin:24px 0 8px">
+  Santa Cruz do Capibaribe – PE, ${hojeExtenso}.
+</div>
+
+<div class="ass-grid">
+  <div class="ass-box">
+    <div class="ass-linha"></div>
+    <div class="ass-nome">José Nivaldo Pereira</div>
+    <div class="ass-cargo">CEO — Grupo Aliança Monitoramento</div>
+  </div>
+  <div class="ass-box">
+    <div class="ass-linha"></div>
+    <div class="ass-nome">João Hinô da Silva Filho</div>
+    <div class="ass-cargo">CMO — Grupo Aliança Monitoramento</div>
+  </div>
+</div>
+
+<div class="rodape">Grupo Aliança Monitoramento — Documento Interno · Ref. ${c.cid} · ${hojeExtenso} · CONFIDENCIAL</div>
+</div>
+</body></html>`;
+
+  adicionarEvento(c.cli,'contrato',`Comprovante interno gerado: ${c.cid} — ${tec}`,'📋');
+  autoSave();
+  M.close();
+  const btn=$('mod-save-btn');if(btn)btn.style.display='';
+
+  const old=document.getElementById('contrato-overlay');if(old)old.remove();
+  const overlay=document.createElement('div');
+  overlay.id='contrato-overlay';
+  overlay.style.cssText='position:fixed;inset:0;background:#fff;z-index:99999;display:flex;flex-direction:column;overflow:hidden';
+  overlay.innerHTML=`
+    <div style="background:#7b1fa2;color:#fff;padding:10px 18px;display:flex;align-items:center;gap:12px;flex-shrink:0">
+      <span style="font-weight:700;font-size:13px;flex:1">📋 Comprovante Interno — ${c.cli}</span>
+      <button onclick="document.getElementById('contrato-overlay').querySelector('iframe').contentWindow.print()" style="background:#fff;color:#7b1fa2;border:none;padding:7px 18px;border-radius:7px;font-weight:800;font-size:13px;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
+      <button onclick="document.getElementById('contrato-overlay').remove()" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:7px 14px;border-radius:7px;font-weight:700;font-size:13px;cursor:pointer">✕ Fechar</button>
+    </div>
+    <iframe style="flex:1;border:none;width:100%" srcdoc=""></iframe>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('iframe').srcdoc=html;
+  toast('📋 Comprovante interno gerado!');
+}
 
 function abrirGerarContrato(){
   const empOpts='<option value="">— Selecione o cliente —</option>'
