@@ -1417,19 +1417,38 @@ async function login(){
   $('le').textContent='';
   if(!u||!p){$('le').textContent='Preencha usuário e senha.';return;}
 
-  // Carrega dados locais (incluindo usuários salvos)
+  $('le').textContent='🔄 Verificando...';
+
+  // Busca usuários atualizados do Supabase ANTES de verificar senha
+  try{
+    const r=await fetch(`${_SB_URL}/rest/v1/crm_data?id=eq.alianca&select=data`,{
+      headers:{'apikey':_SB_KEY,'Authorization':'Bearer '+_SB_KEY}
+    });
+    const rows=await r.json();
+    const p2=rows?.[0]?.data;
+    if(p2?._users?.length){
+      // Substitui USERS pelos do Supabase (fonte da verdade)
+      USERS.length=0;
+      p2._users.forEach(su=>USERS.push(su));
+      localStorage.setItem('alianca_users', JSON.stringify(p2._users));
+    }
+  }catch(e){
+    // Sem internet — usa localStorage
+    try{
+      const saved=localStorage.getItem('alianca_users');
+      if(saved){
+        const arr=JSON.parse(saved);
+        arr.forEach(su=>{ if(!USERS.find(x=>x.id===su.id)) USERS.push(su); });
+      }
+    }catch(e2){}
+  }
+
+  // Carrega dados locais
   carregarLocal();
 
-  // Carrega usuários salvos do localStorage
-  try{
-    const saved=localStorage.getItem('alianca_users');
-    if(saved){
-      const arr=JSON.parse(saved);
-      arr.forEach(su=>{ if(!USERS.find(x=>x.id===su.id)) USERS.push(su); });
-    }
-  }catch(e){}
+  $('le').textContent='';
 
-  // Busca usuário
+  // Busca usuário (agora com lista atualizada do Supabase)
   const f=USERS.find(x=>x.login===u&&x.senha===p);
   if(!f){$('le').textContent='Usuário ou senha incorretos.';return;}
   CU=f;
