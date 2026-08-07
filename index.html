@@ -408,8 +408,8 @@ tr:hover td{background:rgba(255,255,255,.017);}
   <div class="g4">
     <div class="kpi kg"><div class="kic">💰</div><div class="kl">Receita Mensal Total</div><div class="kv" id="k-rec">R$ 0</div><div class="kd" id="k-recd">— sem contratos</div></div>
     <div class="kpi kgr"><div class="kic">📄</div><div class="kl">Contratos Ativos</div><div class="kv" id="k-con">0</div><div class="kd" id="k-cond">—</div></div>
-    <div class="kpi kb"><div class="kic">📹</div><div class="kl">Equipamentos Online</div><div class="kv" id="k-cam">0</div><div class="kd" id="k-camd">—</div></div>
-    <div class="kpi kp"><div class="kic">🔥</div><div class="kl">Leads no Funil</div><div class="kv" id="k-lea">0</div><div class="kd" id="k-lead">—</div></div>
+    <div class="kpi kp"><div class="kic">🏆</div><div class="kl">Receita de Vendas</div><div class="kv" id="k-vendas">R$ 0</div><div class="kd" id="k-vendas-d">vendas fechadas</div></div>
+    <div class="kpi kb"><div class="kic">🔥</div><div class="kl">Leads no Funil</div><div class="kv" id="k-lea">0</div><div class="kd" id="k-lead">—</div></div>
   </div>
 
   <!-- Receita por Tipo de Contrato — LOGO ABAIXO DOS KPIs -->
@@ -1702,9 +1702,15 @@ function updKPI(){
   const recDesc=partes.length?partes.join(' + '):'Nenhuma receita ainda';
 
   // Dashboard KPIs
-  set('k-rec', fmtR(r.recTotal));
-  set('k-recd', recDesc);
+  set('k-rec', fmtR(r.recContratos)); // só contratos
+  set('k-recd', `${r.nContratos} contrato${r.nContratos!==1?'s':''} ativos`);
   set('k-con', r.nContratos);
+
+  // Receita de vendas (deals fechados) separada
+  const recVendas=r.dealsFechados.reduce((a,d)=>a+parseR(d.val),0);
+  set('k-vendas', fmtR(recVendas));
+  set('k-vendas-d', `${r.dealsFechados.length} venda${r.dealsFechados.length!==1?'s':''} fechada${r.dealsFechados.length!==1?'s':''}`);
+
   set('k-lea', leads);
   set('k-os2', osAb);
   set('k-tkt', r.ticketMedio?fmtR(r.ticketMedio):'R$ —');
@@ -1889,13 +1895,14 @@ function rPipeline(){
           </div>`:adm?`<div style="font-size:10px;color:var(--t3);text-align:center;margin-top:6px">Registrado no histórico</div>`:''}
         </div>`;
       }).join(''):`<div style="padding:14px;text-align:center;font-size:11px;color:var(--t3)">Vazio</div>`}
-      <div style="font-size:10px;color:var(--t3);margin-top:4px;font-family:var(--M)">Total: <strong style="color:var(--t2)">${fmtR(tot)}</strong></div>
+      <div style="font-size:10px;color:var(--t3);margin-top:4px">${d.length} negócio${d.length!==1?'s':''} nesta etapa</div>
     </div>`;
   }).join('');
+  // Pipeline KPIs — apenas contagem, sem valores
   const pk=$('pipe-kpis');if(!pk)return;
   pk.innerHTML=DB.stages.map((sg,si)=>{
-    const d=DB.deals.filter(x=>x.stage===si&&!x.cancelado),t=d.reduce((a,x)=>a+parseR(x.val),0);
-    return `<div class="kpi" style="border-top:3px solid ${sg.c}"><div class="kl">${sg.n}</div><div class="kv" style="font-size:18px">${fmtR(t)}</div><div class="kd neu">${d.length} negócios</div></div>`;
+    const d=DB.deals.filter(x=>x.stage===si&&!x.cancelado);
+    return `<div class="kpi" style="border-top:3px solid ${sg.c}"><div class="kl">${sg.n}</div><div class="kv" style="font-size:22px;color:${sg.c}">${d.length}</div><div class="kd neu">negócio${d.length!==1?'s':''}</div></div>`;
   }).join('');
 }
 
