@@ -334,7 +334,6 @@ tr:hover td{background:rgba(255,255,255,.017);}
       <div class="ni" data-p="clientes" onclick="go('clientes',this)"><span class="nic">👥</span>Clientes<span class="nb g" id="nb-clientes">0</span></div>
       <div class="ni" data-p="historico" onclick="go('historico',this)"><span class="nic">📋</span>Histórico</div>
       <div class="ni" data-p="proposta" onclick="go('proposta',this)"><span class="nic">📑</span>Propostas<span class="nb" id="nb-proposta">0</span></div>
-      <div class="ni" data-p="orcamento" onclick="go('orcamento',this)"><span class="nic">🧾</span>Orçamentos<span class="nb" id="nb-orc">0</span></div>
       <div class="ni" data-p="inteligencia" onclick="go('inteligencia',this)"><span class="nic">🧠</span>Inteligência<span class="nb g">IA</span></div>
     </div>
 
@@ -882,17 +881,6 @@ Cliente: Nenhuma ainda, quero instalar..."></textarea>
 </div>
 
 <!-- ████ ORÇAMENTOS ████ -->
-<div class="pg" id="pg-orcamento">
-  <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
-    <div class="srch" style="max-width:260px"><span style="color:var(--t3)">🔍</span><input type="text" placeholder="Buscar orçamento..." oninput="filtrarOrcamentos(this.value)"></div>
-    <div class="fb on" onclick="filtrarOrcStatus(this,'all')">Todos</div>
-    <div class="fb" onclick="filtrarOrcStatus(this,'pendente')">Pendentes</div>
-    <div class="fb" onclick="filtrarOrcStatus(this,'aprovado')">Aprovados</div>
-    <div class="fb" onclick="filtrarOrcStatus(this,'rejeitado')">Rejeitados</div>
-    <button class="btn bg adm" style="margin-left:auto" onclick="novoOrcamento()">+ Novo Orçamento</button>
-  </div>
-  <div id="orc-lista" style="display:flex;flex-direction:column;gap:9px;margin-top:4px"></div>
-</div>
 
 <!-- ████ HISTÓRICO DE CLIENTES ████ -->
 <div class="pg" id="pg-historico">
