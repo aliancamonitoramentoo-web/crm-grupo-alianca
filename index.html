@@ -1437,6 +1437,18 @@ async function login(){
   $('APP').classList.add('show');
   applyProfile();
   initApp();
+
+  // Busca dados do Supabase imediatamente após login
+  // Garante que todos os computadores tenham os dados atualizados
+  setTimeout(async()=>{
+    const sincronizou = await jbReceber();
+    if(sincronizou){
+      _reRenderAll();
+      toast('✅ Dados sincronizados! Bem-vindo, '+f.nome+'!');
+    } else {
+      toast('👋 Bem-vindo, '+f.nome+'!');
+    }
+  }, 1000);
 }
 function logout(){
   clearToken(); CU=null;
