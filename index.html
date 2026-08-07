@@ -385,6 +385,7 @@ tr:hover td{background:rgba(255,255,255,.017);}
       <div class="sav" id="sav">GA</div>
       <div style="flex:1;min-width:0"><div class="sn" id="snm">—</div><div class="sr" id="srl">—</div><div class="sbadge" id="sbadge">ADMIN</div></div>
       <span class="lout" onclick="verResumoDia()" title="Resumo do Dia" style="font-size:13px;margin-right:4px">📋</span>
+      <span class="lout adm" onclick="forcarAtualizacaoTodos()" title="Forçar atualização em todos os computadores" style="font-size:13px;margin-right:4px">🔄</span>
       <span class="lout adm" onclick="forceLogoutAll()" title="Deslogar todos os dispositivos" style="font-size:12px;margin-right:4px">🔒</span>
       <span class="lout" onclick="logout()" title="Sair">⏻</span>
     </div>
@@ -1445,6 +1446,19 @@ function logout(){
 }
 
 // Força deslogar todos os dispositivos — salva flag no Supabase
+async function forcarAtualizacaoTodos(){
+  toast('🔄 Forçando atualização em todos os computadores...');
+  // Salva um timestamp no Supabase — todos os outros CRMs vão detectar e recarregar
+  DB._forceReload = Date.now();
+  DB._ts = Date.now();
+  await jbEnviar(false);
+  // Aguarda 2s e recarrega o próprio também
+  setTimeout(()=>{
+    location.reload();
+  }, 2000);
+  toast('✅ Todos os computadores serão atualizados em segundos!');
+}
+
 async function forceLogoutAll(){
   if(!confirm('Isso vai deslogar TODOS os computadores e celulares do CRM.\n\nTem certeza?')) return;
   try {
@@ -7277,6 +7291,15 @@ async function jbReceber(){
       }
     }
 
+    // Verifica se foi solicitado reload forçado por outro computador
+    const meuReload = parseInt(localStorage.getItem('crm_last_reload'))||0;
+    if(p._forceReload && p._forceReload > meuReload && p._forceReload > (Date.now()-60000)){
+      localStorage.setItem('crm_last_reload', String(p._forceReload));
+      toast('🔄 Atualização recebida! Recarregando...');
+      setTimeout(()=>location.reload(), 1500);
+      return false;
+    }
+
     const tsNuvem=p._ts||0;
     const tsLocal=DB._ts||0;
 
@@ -7306,12 +7329,19 @@ async function jbReceber(){
 
 function iniciarSyncJB(){
   clearInterval(_jbTimer);
-  // Sincroniza logo ao iniciar
   setTimeout(async()=>{ await jbReceber(); }, 1500);
-  // A cada 5s verifica atualizações
-  _jbTimer=setInterval(async()=>{ await jbReceber(); }, 5000);
+  // Verifica a cada 3 segundos — mais rápido para todos os computadores
+  _jbTimer=setInterval(async()=>{
+    await jbReceber();
+    // Verifica se foi solicitado reload forçado
+    const forceReload=localStorage.getItem('crm_force_reload');
+    if(forceReload&&Date.now()-parseInt(forceReload)<30000){
+      localStorage.removeItem('crm_force_reload');
+      location.reload();
+    }
+  }, 3000);
   _jbSync=true;
-  console.log('☁️ Supabase sync ativo (5s)');
+  console.log('☁️ Supabase sync ativo (3s)');
 }
 
 // ═══════════════════════════════════════════════════
