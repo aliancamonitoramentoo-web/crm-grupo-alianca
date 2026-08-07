@@ -430,6 +430,17 @@ tr:hover td{background:rgba(255,255,255,.017);}
     </div>
   </div>
 
+  <!-- Card separado: receita por tipo de contrato -->
+  <div class="card">
+    <div class="ch">
+      <span class="ct">💰 Receita por Tipo de Contrato</span>
+      <span class="pill pg2">Mensal</span>
+    </div>
+    <div class="cb" id="dash-contratos-tipo" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="empty"><div class="ei">📄</div><div class="et">Sem contratos</div></div>
+    </div>
+  </div>
+
   <div class="g21">
     <div class="card"><div class="ch"><span class="ct">Receita por Contrato (real)</span><span class="pill pg2">Ativos</span></div><div class="cb"><div style="height:148px"><canvas id="ch-rec"></canvas></div></div></div>
     <div class="card"><div class="ch"><span class="ct">Serviços no Funil</span></div><div class="cb" id="srv-bars"><div class="empty"><div class="ei">📊</div><div class="et">Sem dados</div><div class="es">Cadastre leads para ver</div></div></div></div>
@@ -1120,11 +1131,22 @@ const _SB_URL = 'https://yiauzqmjuejxkdezurtu.supabase.co';
 const _SB_KEY = 'sb_publishable_lQ_JxlJ92yZNuujGmJXzfg_tXsKs79c';
 
 // ── USUÁRIOS ─────────────────────────────
+// ── VERSÃO DO CRM — muda aqui para forçar limpeza de cache em todos ──
+const CRM_VERSION = '2.1';
+(function(){
+  const v = localStorage.getItem('crm_version');
+  if(v !== CRM_VERSION){
+    // Versão diferente — limpa cache de usuários para forçar re-sync do Supabase
+    localStorage.removeItem('alianca_users');
+    localStorage.setItem('crm_version', CRM_VERSION);
+    console.log('🔄 Cache de usuários limpo — nova versão: '+CRM_VERSION);
+  }
+})();
+
+// ── USUÁRIOS PADRÃO (somente admin — outros são gerenciados pelo Supabase) ──
 const USERS=[
-  {id:1,nome:'Hino',   login:'hino',   senha:'alianca@123',perfil:'admin', cor:'#f5a623',ini:'HI'},
-  {id:2,nome:'Nivaldo',login:'nivaldo',senha:'alianca@123',perfil:'admin', cor:'#3d9bff',ini:'NI'},
-  {id:3,nome:'Teste 1',login:'teste1', senha:'teste@123',  perfil:'normal',cor:'#00d97e',ini:'T1'},
-  {id:4,nome:'Teste 2',login:'teste2', senha:'teste@123',  perfil:'normal',cor:'#b08fff',ini:'T2'},
+  {id:1,nome:'Hino',   login:'hino',   senha:'2209',perfil:'admin', cor:'#f5a623',ini:'HI'},
+  {id:2,nome:'Nivaldo',login:'nivaldo',senha:'2209',perfil:'admin', cor:'#3d9bff',ini:'NI'},
 ];
 const P_ADM=['✅ Dashboard completo','✅ Cadastrar/editar/excluir qualquer dado','✅ Financeiro e Cobranças','✅ Relatórios e Equipe','✅ Usuários e Configurações','✅ Criar Usuários (login/senha)'];
 const P_NRM=['✅ Ver Dashboard','✅ Ver Empresas, Contatos, Pipeline','✅ Ver OS, Contratos, Agenda','✅ Criar Tarefas e Eventos','✅ Notificações e WhatsApp','❌ Financeiro / Cobranças / Relatórios','❌ Usuários / Configurações'];
@@ -1622,6 +1644,50 @@ function calcReceita(){
   };
 }
 
+function rDashContratosTipo(){
+  const el=$('dash-contratos-tipo'); if(!el) return;
+  const ativos=DB.contratos.filter(c=>c.s==='at');
+  if(!ativos.length){
+    el.innerHTML=`<div style="grid-column:1/-1">${empty('📄','Sem contratos ativos','Cadastre contratos para ver a receita por tipo')}</div>`;
+    return;
+  }
+
+  // Agrupa por tipo de serviço
+  const grupos={};
+  ativos.forEach(c=>{
+    const srv=(c.srv||'Outros').trim();
+    if(!grupos[srv]) grupos[srv]={total:0,qtd:0,clientes:[]};
+    grupos[srv].total+=parseR(c.val);
+    grupos[srv].qtd++;
+    grupos[srv].clientes.push(c.cli);
+  });
+
+  const totalGeral=ativos.reduce((a,c)=>a+parseR(c.val),0);
+  const cores=['#f5a623','#3d9bff','#00d97e','#b08fff','#ff8c42','#ff4560'];
+
+  el.style.display='grid';
+  el.style.gridTemplateColumns='repeat(auto-fill,minmax(200px,1fr))';
+
+  el.innerHTML=Object.entries(grupos).sort((a,b)=>b[1].total-a[1].total).map(([srv,g],i)=>{
+    const pct=totalGeral?Math.round(g.total/totalGeral*100):0;
+    const cor=cores[i%cores.length];
+    return `<div style="background:var(--s2);border-radius:11px;padding:13px;border-top:3px solid ${cor}">
+      <div style="font-size:11px;color:var(--t3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.7px">${srv}</div>
+      <div style="font-size:22px;font-weight:900;color:${cor};font-family:var(--M)">${fmtR(g.total)}</div>
+      <div style="font-size:11px;color:var(--t2);margin-top:3px">${g.qtd} contrato${g.qtd>1?'s':''} · ${pct}% da receita</div>
+      <div style="height:4px;background:var(--bd);border-radius:2px;margin-top:8px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${cor};border-radius:2px"></div>
+      </div>
+      <div style="font-size:10px;color:var(--t3);margin-top:5px">${g.clientes.slice(0,2).join(', ')}${g.clientes.length>2?` +${g.clientes.length-2}`:''}</div>
+    </div>`;
+  }).join('')+`
+    <div style="background:rgba(245,166,35,.06);border:1px solid rgba(245,166,35,.2);border-radius:11px;padding:13px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center">
+      <div style="font-size:11px;color:var(--t3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.7px">Total Geral</div>
+      <div style="font-size:24px;font-weight:900;color:var(--gold);font-family:var(--M)">${fmtR(totalGeral)}</div>
+      <div style="font-size:11px;color:var(--t2);margin-top:3px">${ativos.length} contratos ativos</div>
+    </div>`;
+}
+
 function updKPI(){
   const r=calcReceita();
   const leads=DB.deals.filter(d=>d.stage<DB.stages.length-1&&!d.cancelado).length;
@@ -1675,6 +1741,7 @@ function updKPI(){
   const wb=$('wa-ubadge'); if(wb) wb.textContent=DB.wa.reduce((a,c)=>a+c.u,0)+' não lidas';
   // Atualiza metas no dashboard
   setTimeout(rDashMetas, 50);
+  setTimeout(rDashContratosTipo, 50);
 }
 
 function updBars(){
