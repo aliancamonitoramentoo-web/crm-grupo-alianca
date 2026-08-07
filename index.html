@@ -406,11 +406,23 @@ tr:hover td{background:rgba(255,255,255,.017);}
 <!-- DASHBOARD -->
 <div class="pg on" id="pg-dashboard">
   <div class="g4">
-    <div class="kpi kg"><div class="kic">💰</div><div class="kl">Receita Mensal</div><div class="kv" id="k-rec">R$ 0</div><div class="kd" id="k-recd">— sem contratos</div></div>
+    <div class="kpi kg"><div class="kic">💰</div><div class="kl">Receita Mensal Total</div><div class="kv" id="k-rec">R$ 0</div><div class="kd" id="k-recd">— sem contratos</div></div>
     <div class="kpi kgr"><div class="kic">📄</div><div class="kl">Contratos Ativos</div><div class="kv" id="k-con">0</div><div class="kd" id="k-cond">—</div></div>
     <div class="kpi kb"><div class="kic">📹</div><div class="kl">Equipamentos Online</div><div class="kv" id="k-cam">0</div><div class="kd" id="k-camd">—</div></div>
     <div class="kpi kp"><div class="kic">🔥</div><div class="kl">Leads no Funil</div><div class="kv" id="k-lea">0</div><div class="kd" id="k-lead">—</div></div>
   </div>
+
+  <!-- Receita por Tipo de Contrato — LOGO ABAIXO DOS KPIs -->
+  <div class="card">
+    <div class="ch">
+      <span class="ct">💰 Receita por Tipo de Contrato</span>
+      <span class="pill pg2">Mensal</span>
+    </div>
+    <div class="cb" id="dash-contratos-tipo" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">
+      <div class="empty"><div class="ei">📄</div><div class="et">Sem contratos</div></div>
+    </div>
+  </div>
+
   <div class="g4">
     <div class="kpi kr"><div class="kic">🚨</div><div class="kl">Alertas Hoje</div><div class="kv" id="k-alm">0</div><div class="kd" id="k-almd">✓ tranquilo</div></div>
     <div class="kpi ko"><div class="kic">🔧</div><div class="kl">OS Abertas</div><div class="kv" id="k-os2">0</div><div class="kd" id="k-os2d">—</div></div>
@@ -427,17 +439,6 @@ tr:hover td{background:rgba(255,255,255,.017);}
     </div>
     <div class="cb" id="dash-metas">
       <div class="empty"><div class="ei">🎯</div><div class="et">Nenhuma meta definida</div><div class="es">Clique em "Gerenciar Metas" para criar</div></div>
-    </div>
-  </div>
-
-  <!-- Card separado: receita por tipo de contrato -->
-  <div class="card">
-    <div class="ch">
-      <span class="ct">💰 Receita por Tipo de Contrato</span>
-      <span class="pill pg2">Mensal</span>
-    </div>
-    <div class="cb" id="dash-contratos-tipo" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div class="empty"><div class="ei">📄</div><div class="et">Sem contratos</div></div>
     </div>
   </div>
 
