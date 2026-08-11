@@ -3001,7 +3001,7 @@ function confirmarFechou(id, linkEl){
   const titulo=tipoOSMap[tipo];
 
   // 0) WhatsApp pra Gilmara (0800) — link real preparado ANTES de qualquer outra coisa, pra não ser bloqueado pelo navegador
-  const msg=`✅ *CLIENTE FECHOU — Grupo Aliança*\n\n👤 ${cli}\n📋 Serviço: ${titulo}\n📅 Agendado: ${dataFmt} às ${horaFmt}\n${tec?'👷 Técnico: '+tec+'\n':''}${endereco?'📍 '+endereco+'\n':''}${obs?'📝 '+obs+'\n':''}\n👉 Gilmara, confirmar o agendamento com o cliente.\n\n— Sistema CRM 🛡️`;
+  const msg=`${EMO.check} *CLIENTE FECHOU — Grupo Aliança*\n\n${EMO.pessoa} ${cli}\n${EMO.clip} Serviço: ${titulo}\n${EMO.cal} Agendado: ${dataFmt} às ${horaFmt}\n${tec?EMO.worker+' Técnico: '+tec+'\n':''}${endereco?EMO.pin+' '+endereco+'\n':''}${obs?EMO.memo+' '+obs+'\n':''}\n${EMO.dedo} Gilmara, confirmar o agendamento com o cliente.\n\n— Sistema CRM ${EMO.escudo}`;
   enviarWhats0800(msg);
 
   // 1) Remove a visita da agenda (concluída)
@@ -3074,7 +3074,7 @@ function confirmarNaoFechou(id, linkEl){
 
   // 0) WhatsApp pra Gilmara (0800) — link real preparado ANTES de qualquer outra coisa, pra não ser bloqueado pelo navegador
   const tel=emp?.tel?emp.tel.replace(/\D/g,''):'';
-  const msg=`🎣 *RECONQUISTA — Grupo Aliança*\n\n👤 ${cli}\n❌ Não fechou na visita\n❓ Motivo: *${motivo}*\n${obs?'📝 '+obs+'\n':''}${tel?'📱 WhatsApp cliente: '+tel+'\n':''}📅 Retornar em: ${retornoFmt}\n\n👉 Gilmara, entrar em contato p/ tentar reconquistar esse cliente.\n\n— Sistema CRM 🛡️`;
+  const msg=`${EMO.peixe} *RECONQUISTA — Grupo Aliança*\n\n${EMO.pessoa} ${cli}\n${EMO.x} Não fechou na visita\n${EMO.interr} Motivo: *${motivo}*\n${obs?EMO.memo+' '+obs+'\n':''}${tel?EMO.fone+' WhatsApp cliente: '+tel+'\n':''}${EMO.cal} Retornar em: ${retornoFmt}\n\n${EMO.dedo} Gilmara, entrar em contato p/ tentar reconquistar esse cliente.\n\n— Sistema CRM ${EMO.escudo}`;
   enviarWhats0800(msg);
 
   // 1) Remove a visita da agenda
@@ -3109,7 +3109,7 @@ function visitaPensar(id, linkEl){
 
   // 0) WhatsApp pra Gilmara (0800) — link real preparado ANTES de qualquer outra coisa, pra não ser bloqueado pelo navegador
   const tel=emp?.tel?emp.tel.replace(/\D/g,''):'';
-  const msg=`🤔 *CLIENTE VAI PENSAR — Grupo Aliança*\n\n👤 ${cli}\n📞 Ficou de pensar na visita\n${tel?'📱 WhatsApp cliente: '+tel+'\n':''}📅 Retornar em: ${rFmt}\n\n👉 Gilmara, dar um retorno leve nesse cliente.\n\n— Sistema CRM 🛡️`;
+  const msg=`${EMO.pensa} *CLIENTE VAI PENSAR — Grupo Aliança*\n\n${EMO.pessoa} ${cli}\n${EMO.telefone} Ficou de pensar na visita\n${tel?EMO.fone+' WhatsApp cliente: '+tel+'\n':''}${EMO.cal} Retornar em: ${rFmt}\n\n${EMO.dedo} Gilmara, dar um retorno leve nesse cliente.\n\n— Sistema CRM ${EMO.escudo}`;
   enviarWhats0800(msg);
 
   _removerEvento(id);
@@ -9010,6 +9010,17 @@ const EQUIPE_NUMEROS = [
 // ── Número do 0800 / Atendente (Gilmara) — WhatsApp ──
 // 👉 Para trocar o número, edite a linha abaixo (formato: 55 + número só com dígitos)
 const NUM_0800 = { nome:'Gilmara (0800)', tel:'558000003813' };
+// Emojis reconstruídos de código puro (ASCII) — sobrevivem a qualquer copy-paste/encoding
+const EMO = {
+  peixe:String.fromCodePoint(0x1F3A3), pessoa:String.fromCodePoint(0x1F464),
+  x:String.fromCodePoint(0x274C), interr:String.fromCodePoint(0x2753),
+  memo:String.fromCodePoint(0x1F4DD), fone:String.fromCodePoint(0x1F4F1),
+  cal:String.fromCodePoint(0x1F4C5), dedo:String.fromCodePoint(0x1F449),
+  escudo:String.fromCodePoint(0x1F6E1,0xFE0F), check:String.fromCodePoint(0x2705),
+  clip:String.fromCodePoint(0x1F4CB), worker:String.fromCodePoint(0x1F477),
+  pin:String.fromCodePoint(0x1F4CD), festa:String.fromCodePoint(0x1F389),
+  telefone:String.fromCodePoint(0x1F4DE), pensa:String.fromCodePoint(0x1F914)
+};
 function enviarWhats0800(msg){
   const url=`https://wa.me/${NUM_0800.tel}?text=${encodeURIComponent(msg)}`;
   let w=null;
