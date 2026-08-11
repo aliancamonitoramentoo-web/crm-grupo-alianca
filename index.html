@@ -1813,7 +1813,8 @@ function advDeal(id,dir){
     addFeed('🔀','rgba(245,166,35,.12)',`${d.emp} → ${nomeEtapa}`);
   }
 
-  rPipeline(); updKPI(); autoSave();
+  rPipeline(); updKPI();
+  DB._ts=Date.now(); salvarLocal(); jbEnviar(false);
 }
 
 function rPipeline(){
@@ -9003,8 +9004,22 @@ const EQUIPE_NUMEROS = [
 // 👉 Para trocar o número, edite a linha abaixo (formato: 55 + número só com dígitos)
 const NUM_0800 = { nome:'Gilmara (0800)', tel:'5508000003813' };
 function enviarWhats0800(msg){
-  try{ window.open(`https://wa.me/${NUM_0800.tel}?text=${encodeURIComponent(msg)}`,'_blank'); }
-  catch(e){ toast('⚠️ Não foi possível abrir o WhatsApp da Gilmara.'); }
+  const old=document.getElementById('wa-0800-modal'); if(old)old.remove();
+  const div=document.createElement('div');
+  div.id='wa-0800-modal';
+  div.style.cssText='position:fixed;bottom:20px;right:20px;background:var(--s1);border:1px solid var(--green);border-radius:12px;padding:14px;z-index:99999;max-width:290px;box-shadow:0 8px 28px rgba(0,0,0,.5)';
+  div.innerHTML=`
+    <div style="font-size:12px;font-weight:800;color:var(--green);margin-bottom:4px">💬 Avisar Gilmara (0800)</div>
+    <div style="font-size:10.5px;color:var(--t3);margin-bottom:10px;line-height:1.4">Toque abaixo para abrir o WhatsApp com a mensagem já pronta.</div>
+    <a href="https://wa.me/${NUM_0800.tel}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener"
+      onclick="setTimeout(()=>{const m=document.getElementById('wa-0800-modal');if(m)m.remove();},400)"
+      style="display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;background:#25D366;border-radius:9px;text-decoration:none;color:#000;font-weight:800;font-size:13px">
+      <span style="font-size:18px">📱</span> Abrir WhatsApp da Gilmara
+    </a>
+    <button onclick="document.getElementById('wa-0800-modal').remove()"
+      style="width:100%;padding:7px;background:transparent;border:1px solid var(--bd);border-radius:7px;color:var(--t3);font-size:11px;cursor:pointer;font-family:var(--F);margin-top:7px">Fechar</button>`;
+  document.body.appendChild(div);
+  setTimeout(()=>{const m=document.getElementById('wa-0800-modal');if(m)m.remove();},45000);
 }
 
 // Envia WhatsApp para toda a equipe — mostra botões separados
