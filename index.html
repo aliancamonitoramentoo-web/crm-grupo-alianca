@@ -2947,7 +2947,7 @@ function finalizarVisita(id){
     <div style="display:flex;flex-direction:column;gap:8px">
       <button onclick="visitaFechou('${id}')" style="padding:13px;border-radius:10px;border:none;background:var(--green);color:#000;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--F)">✅ Sim, fechou!</button>
       <button onclick="visitaNaoFechou('${id}')" style="padding:13px;border-radius:10px;border:1px solid rgba(255,69,96,.35);background:rgba(255,69,96,.1);color:var(--red);font-size:14px;font-weight:800;cursor:pointer;font-family:var(--F)">❌ Não fechou</button>
-      <button onclick="visitaPensar('${id}')" style="padding:13px;border-radius:10px;border:1px solid var(--bd);background:var(--s2);color:var(--t2);font-size:14px;font-weight:700;cursor:pointer;font-family:var(--F)">🤔 Vai pensar</button>
+      <a href="#" onclick="return visitaPensar('${id}',this);" style="display:block;text-align:center;text-decoration:none;padding:13px;border-radius:10px;border:1px solid var(--bd);background:var(--s2);color:var(--t2);font-size:14px;font-weight:700;cursor:pointer;font-family:var(--F)">🤔 Vai pensar</a>
     </div>`;
   const b=$('mod-save-btn'); if(b)b.style.display='none';
   $('MOD').classList.add('open');
@@ -2979,13 +2979,13 @@ function visitaFechou(id){
     <div class="fg"><label>📅 Data e Hora do Serviço</label><input class="fc" id="vf-data" type="datetime-local" value="${defDate}"></div>
     <div class="fg"><label>Endereço</label><input class="fc" id="vf-end" value="${endereco}" placeholder="Endereço do serviço"></div>
     <div class="fg"><label>Observações</label><textarea class="fc" id="vf-obs" rows="2" placeholder="O que foi vendido / detalhes">${ev.obs||''}</textarea></div>
-    <button onclick="confirmarFechou('${id}')" style="width:100%;padding:12px;margin-top:6px;background:var(--green);border:none;border-radius:10px;color:#000;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--F)">✅ Confirmar e Agendar</button>`;
+    <a href="#" onclick="return confirmarFechou('${id}',this);" style="display:block;text-align:center;text-decoration:none;width:100%;padding:12px;margin-top:6px;background:var(--green);border:none;border-radius:10px;color:#000;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--F);box-sizing:border-box">✅ Confirmar e Agendar</a>`;
   const b=$('mod-save-btn'); if(b)b.style.display='none';
   $('MOD').classList.add('open');
 }
 
-function confirmarFechou(id){
-  const {ev}=_acharEvento(id); if(!ev)return;
+function confirmarFechou(id, linkEl){
+  const {ev}=_acharEvento(id); if(!ev)return false;
   const cli=ev.cli||'';
   const tipo=$('vf-tipo')?.value||'instalacao';
   const tec=$('vf-tec')?.value||'';
@@ -3000,9 +3000,9 @@ function confirmarFechou(id){
   else {horaFmt=nowStr(); dataFmt=new Date().toLocaleDateString('pt-BR');}
   const titulo=tipoOSMap[tipo];
 
-  // 0) WhatsApp pra Gilmara (0800) — abre PRIMEIRO, direto no clique, pra não ser bloqueado pelo navegador
+  // 0) WhatsApp pra Gilmara (0800) — link real preparado ANTES de qualquer outra coisa, pra não ser bloqueado pelo navegador
   const msg=`✅ *CLIENTE FECHOU — Grupo Aliança*\n\n👤 ${cli}\n📋 Serviço: ${titulo}\n📅 Agendado: ${dataFmt} às ${horaFmt}\n${tec?'👷 Técnico: '+tec+'\n':''}${endereco?'📍 '+endereco+'\n':''}${obs?'📝 '+obs+'\n':''}\n👉 Gilmara, confirmar o agendamento com o cliente.\n\n— Sistema CRM 🛡️`;
-  enviarWhats0800(msg);
+  enviarWhats0800(msg, linkEl);
 
   // 1) Remove a visita da agenda (concluída)
   _removerEvento(id);
@@ -3027,6 +3027,7 @@ function confirmarFechou(id){
   const b=$('mod-save-btn'); if(b)b.style.display=''; M.close();
 
   toast(`🎉 Fechou! ${titulo} agendada e WhatsApp enviado p/ Gilmara.`);
+  return true;
 }
 
 // ── Caminho 2: NÃO FECHOU → motivo + funil reconquista + tarefa + WhatsApp ──
@@ -3055,13 +3056,13 @@ function visitaNaoFechou(id){
         <option value="30">Em 30 dias</option>
       </select>
     </div>
-    <button onclick="confirmarNaoFechou('${id}')" style="width:100%;padding:12px;margin-top:6px;background:var(--red);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--F)">🎣 Enviar p/ Reconquista</button>`;
+    <a href="#" onclick="return confirmarNaoFechou('${id}',this);" style="display:block;text-align:center;text-decoration:none;width:100%;padding:12px;margin-top:6px;background:var(--red);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--F);box-sizing:border-box">🎣 Enviar p/ Reconquista</a>`;
   const b=$('mod-save-btn'); if(b)b.style.display='none';
   $('MOD').classList.add('open');
 }
 
-function confirmarNaoFechou(id){
-  const {ev}=_acharEvento(id); if(!ev)return;
+function confirmarNaoFechou(id, linkEl){
+  const {ev}=_acharEvento(id); if(!ev)return false;
   const cli=ev.cli||'';
   const motivo=$('nf-motivo')?.value||'Outro';
   const obs=($('nf-obs')?.value||'').trim();
@@ -3071,10 +3072,10 @@ function confirmarNaoFechou(id){
   const retornoFmt=retorno.toLocaleDateString('pt-BR');
   const retornoRaw=`${retorno.getFullYear()}-${String(retorno.getMonth()+1).padStart(2,'0')}-${String(retorno.getDate()).padStart(2,'0')}`;
 
-  // 0) WhatsApp pra Gilmara (0800) — abre PRIMEIRO, direto no clique, pra não ser bloqueado pelo navegador
+  // 0) WhatsApp pra Gilmara (0800) — link real preparado ANTES de qualquer outra coisa, pra não ser bloqueado pelo navegador
   const tel=emp?.tel?emp.tel.replace(/\D/g,''):'';
   const msg=`🎣 *RECONQUISTA — Grupo Aliança*\n\n👤 ${cli}\n❌ Não fechou na visita\n❓ Motivo: *${motivo}*\n${obs?'📝 '+obs+'\n':''}${tel?'📱 WhatsApp cliente: '+tel+'\n':''}📅 Retornar em: ${retornoFmt}\n\n👉 Gilmara, entrar em contato p/ tentar reconquistar esse cliente.\n\n— Sistema CRM 🛡️`;
-  enviarWhats0800(msg);
+  enviarWhats0800(msg, linkEl);
 
   // 1) Remove a visita da agenda
   _removerEvento(id);
@@ -3094,21 +3095,22 @@ function confirmarNaoFechou(id){
   const b=$('mod-save-btn'); if(b)b.style.display=''; M.close();
 
   toast(`🎣 ${cli} enviado p/ reconquista! WhatsApp na Gilmara.`);
+  return true;
 }
 
 // ── Caminho 3: VAI PENSAR → retorno curto (3 dias) + tarefa + WhatsApp ──
-function visitaPensar(id){
-  const {ev}=_acharEvento(id); if(!ev)return;
+function visitaPensar(id, linkEl){
+  const {ev}=_acharEvento(id); if(!ev)return false;
   const cli=ev.cli||'';
   const emp=DB.empresas.find(e=>e.nome===cli)||{};
   const r=new Date(); r.setDate(r.getDate()+3);
   const rFmt=r.toLocaleDateString('pt-BR');
   const rRaw=`${r.getFullYear()}-${String(r.getMonth()+1).padStart(2,'0')}-${String(r.getDate()).padStart(2,'0')}`;
 
-  // 0) WhatsApp pra Gilmara (0800) — abre PRIMEIRO, direto no clique, pra não ser bloqueado pelo navegador
+  // 0) WhatsApp pra Gilmara (0800) — link real preparado ANTES de qualquer outra coisa, pra não ser bloqueado pelo navegador
   const tel=emp?.tel?emp.tel.replace(/\D/g,''):'';
   const msg=`🤔 *CLIENTE VAI PENSAR — Grupo Aliança*\n\n👤 ${cli}\n📞 Ficou de pensar na visita\n${tel?'📱 WhatsApp cliente: '+tel+'\n':''}📅 Retornar em: ${rFmt}\n\n👉 Gilmara, dar um retorno leve nesse cliente.\n\n— Sistema CRM 🛡️`;
-  enviarWhats0800(msg);
+  enviarWhats0800(msg, linkEl);
 
   _removerEvento(id);
 
@@ -3125,6 +3127,7 @@ function visitaPensar(id){
   const b=$('mod-save-btn'); if(b)b.style.display=''; M.close();
 
   toast(`📞 Retorno de ${cli} agendado p/ ${rFmt}. WhatsApp na Gilmara.`);
+  return true;
 }
 
 
@@ -9007,8 +9010,14 @@ const EQUIPE_NUMEROS = [
 // ── Número do 0800 / Atendente (Gilmara) — WhatsApp ──
 // 👉 Para trocar o número, edite a linha abaixo (formato: 55 + número só com dígitos)
 const NUM_0800 = { nome:'Gilmara (0800)', tel:'558000003813' };
-function enviarWhats0800(msg){
-  window.open(`https://wa.me/${NUM_0800.tel}?text=${encodeURIComponent(msg)}`,'_blank','noopener');
+function enviarWhats0800(msg, linkEl){
+  const url=`https://wa.me/${NUM_0800.tel}?text=${encodeURIComponent(msg)}`;
+  if(linkEl){
+    // Preenche o link real do botão — o navegador segue essa navegação como clique genuíno do usuário (não é bloqueado)
+    linkEl.href=url; linkEl.target='_blank'; linkEl.rel='noopener';
+  } else {
+    window.open(url,'_blank','noopener');
+  }
 }
 
 // Envia WhatsApp para toda a equipe — mostra botões separados
