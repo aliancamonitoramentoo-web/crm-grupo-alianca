@@ -2922,13 +2922,14 @@ function atualizarCorAgenda(tipo){
 //  Encadeia: Agenda + OS + Funil Reconquista + WhatsApp Gilmara (0800)
 // ═══════════════════════════════════════════════
 function _acharEvento(id){
-  let ev=DB.agenda.h.find(x=>x.id===id), p='h';
-  if(!ev){ev=DB.agenda.s.find(x=>x.id===id); p='s';}
+  const eq=x=>String(x.id)===String(id);
+  let ev=DB.agenda.h.find(eq), p='h';
+  if(!ev){ev=DB.agenda.s.find(eq); p='s';}
   return {ev,p};
 }
 function _removerEvento(id){
-  DB.agenda.h=DB.agenda.h.filter(x=>x.id!==id);
-  DB.agenda.s=DB.agenda.s.filter(x=>x.id!==id);
+  DB.agenda.h=DB.agenda.h.filter(x=>String(x.id)!==String(id));
+  DB.agenda.s=DB.agenda.s.filter(x=>String(x.id)!==String(id));
 }
 
 function finalizarVisita(id){
