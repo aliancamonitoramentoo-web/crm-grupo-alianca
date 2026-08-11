@@ -3000,6 +3000,10 @@ function confirmarFechou(id){
   else {horaFmt=nowStr(); dataFmt=new Date().toLocaleDateString('pt-BR');}
   const titulo=tipoOSMap[tipo];
 
+  // 0) WhatsApp pra Gilmara (0800) — abre PRIMEIRO, direto no clique, pra não ser bloqueado pelo navegador
+  const msg=`✅ *CLIENTE FECHOU — Grupo Aliança*\n\n👤 ${cli}\n📋 Serviço: ${titulo}\n📅 Agendado: ${dataFmt} às ${horaFmt}\n${tec?'👷 Técnico: '+tec+'\n':''}${endereco?'📍 '+endereco+'\n':''}${obs?'📝 '+obs+'\n':''}\n👉 Gilmara, confirmar o agendamento com o cliente.\n\n— Sistema CRM 🛡️`;
+  enviarWhats0800(msg);
+
   // 1) Remove a visita da agenda (concluída)
   _removerEvento(id);
 
@@ -3022,9 +3026,6 @@ function confirmarFechou(id){
   rAgenda(); if(typeof rOS==='function')rOS(); rNotifs(); updKPI(); autoSave();
   const b=$('mod-save-btn'); if(b)b.style.display=''; M.close();
 
-  // 5) WhatsApp pra Gilmara (0800)
-  const msg=`✅ *CLIENTE FECHOU — Grupo Aliança*\n\n👤 ${cli}\n📋 Serviço: ${titulo}\n📅 Agendado: ${dataFmt} às ${horaFmt}\n${tec?'👷 Técnico: '+tec+'\n':''}${endereco?'📍 '+endereco+'\n':''}${obs?'📝 '+obs+'\n':''}\n👉 Gilmara, confirmar o agendamento com o cliente.\n\n— Sistema CRM 🛡️`;
-  enviarWhats0800(msg);
   toast(`🎉 Fechou! ${titulo} agendada e WhatsApp enviado p/ Gilmara.`);
 }
 
@@ -3070,6 +3071,11 @@ function confirmarNaoFechou(id){
   const retornoFmt=retorno.toLocaleDateString('pt-BR');
   const retornoRaw=`${retorno.getFullYear()}-${String(retorno.getMonth()+1).padStart(2,'0')}-${String(retorno.getDate()).padStart(2,'0')}`;
 
+  // 0) WhatsApp pra Gilmara (0800) — abre PRIMEIRO, direto no clique, pra não ser bloqueado pelo navegador
+  const tel=emp?.tel?emp.tel.replace(/\D/g,''):'';
+  const msg=`🎣 *RECONQUISTA — Grupo Aliança*\n\n👤 ${cli}\n❌ Não fechou na visita\n❓ Motivo: *${motivo}*\n${obs?'📝 '+obs+'\n':''}${tel?'📱 WhatsApp cliente: '+tel+'\n':''}📅 Retornar em: ${retornoFmt}\n\n👉 Gilmara, entrar em contato p/ tentar reconquistar esse cliente.\n\n— Sistema CRM 🛡️`;
+  enviarWhats0800(msg);
+
   // 1) Remove a visita da agenda
   _removerEvento(id);
 
@@ -3087,10 +3093,6 @@ function confirmarNaoFechou(id){
   rAgenda(); if(typeof rPipeline==='function')rPipeline(); if(typeof rTasks==='function')rTasks(); rNotifs(); updKPI(); autoSave();
   const b=$('mod-save-btn'); if(b)b.style.display=''; M.close();
 
-  // 5) WhatsApp pra Gilmara (0800)
-  const tel=emp?.tel?emp.tel.replace(/\D/g,''):'';
-  const msg=`🎣 *RECONQUISTA — Grupo Aliança*\n\n👤 ${cli}\n❌ Não fechou na visita\n❓ Motivo: *${motivo}*\n${obs?'📝 '+obs+'\n':''}${tel?'📱 WhatsApp cliente: '+tel+'\n':''}📅 Retornar em: ${retornoFmt}\n\n👉 Gilmara, entrar em contato p/ tentar reconquistar esse cliente.\n\n— Sistema CRM 🛡️`;
-  enviarWhats0800(msg);
   toast(`🎣 ${cli} enviado p/ reconquista! WhatsApp na Gilmara.`);
 }
 
@@ -3102,6 +3104,11 @@ function visitaPensar(id){
   const r=new Date(); r.setDate(r.getDate()+3);
   const rFmt=r.toLocaleDateString('pt-BR');
   const rRaw=`${r.getFullYear()}-${String(r.getMonth()+1).padStart(2,'0')}-${String(r.getDate()).padStart(2,'0')}`;
+
+  // 0) WhatsApp pra Gilmara (0800) — abre PRIMEIRO, direto no clique, pra não ser bloqueado pelo navegador
+  const tel=emp?.tel?emp.tel.replace(/\D/g,''):'';
+  const msg=`🤔 *CLIENTE VAI PENSAR — Grupo Aliança*\n\n👤 ${cli}\n📞 Ficou de pensar na visita\n${tel?'📱 WhatsApp cliente: '+tel+'\n':''}📅 Retornar em: ${rFmt}\n\n👉 Gilmara, dar um retorno leve nesse cliente.\n\n— Sistema CRM 🛡️`;
+  enviarWhats0800(msg);
 
   _removerEvento(id);
 
@@ -3117,9 +3124,6 @@ function visitaPensar(id){
   rAgenda(); if(typeof rTasks==='function')rTasks(); rNotifs(); updKPI(); autoSave();
   const b=$('mod-save-btn'); if(b)b.style.display=''; M.close();
 
-  const tel=emp?.tel?emp.tel.replace(/\D/g,''):'';
-  const msg=`🤔 *CLIENTE VAI PENSAR — Grupo Aliança*\n\n👤 ${cli}\n📞 Ficou de pensar na visita\n${tel?'📱 WhatsApp cliente: '+tel+'\n':''}📅 Retornar em: ${rFmt}\n\n👉 Gilmara, dar um retorno leve nesse cliente.\n\n— Sistema CRM 🛡️`;
-  enviarWhats0800(msg);
   toast(`📞 Retorno de ${cli} agendado p/ ${rFmt}. WhatsApp na Gilmara.`);
 }
 
