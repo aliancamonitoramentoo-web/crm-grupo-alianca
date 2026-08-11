@@ -312,7 +312,7 @@ tr:hover td{background:rgba(255,255,255,.017);}
 <div class="sb" id="SIDEBAR">
   <!-- Botão fechar no mobile -->
   <button onclick="toggleSidebar()" style="display:none;position:absolute;top:10px;right:10px;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:18px;width:32px;height:32px;border-radius:8px;cursor:pointer;align-items:center;justify-content:center;z-index:10" id="mob-close-btn">✕</button>
-  <div class="slogo"><div class="smark">⚡</div><div><div class="sname">Aliance <span style="font-size:9px;color:#00d97e;font-weight:700;background:rgba(0,217,126,.12);padding:1px 6px;border-radius:6px;vertical-align:middle">v46 ✓emoji</span></div><div class="ssub">Gerencie clientes. Feche mais negócios.</div></div></div>
+  <div class="slogo"><div class="smark">⚡</div><div><div class="sname">Aliance <span style="font-size:9px;color:#00d97e;font-weight:700;background:rgba(0,217,126,.12);padding:1px 6px;border-radius:6px;vertical-align:middle">v47 IA</span></div><div class="ssub">Gerencie clientes. Feche mais negócios.</div></div></div>
   <nav id="NAV">
 
     <!-- ── PRINCIPAL (colapsável) ── -->
@@ -2947,7 +2947,7 @@ function finalizarVisita(id){
     <div style="display:flex;flex-direction:column;gap:8px">
       <button onclick="visitaFechou('${id}')" style="padding:13px;border-radius:10px;border:none;background:var(--green);color:#000;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--F)">✅ Sim, fechou!</button>
       <button onclick="visitaNaoFechou('${id}')" style="padding:13px;border-radius:10px;border:1px solid rgba(255,69,96,.35);background:rgba(255,69,96,.1);color:var(--red);font-size:14px;font-weight:800;cursor:pointer;font-family:var(--F)">❌ Não fechou</button>
-      <a href="#" onclick="return visitaPensar('${id}',this);" style="display:block;text-align:center;text-decoration:none;padding:13px;border-radius:10px;border:1px solid var(--bd);background:var(--s2);color:var(--t2);font-size:14px;font-weight:700;cursor:pointer;font-family:var(--F)">🤔 Vai pensar</a>
+      <a href="#" onclick="visitaPensar('${id}');return false;" style="display:block;text-align:center;text-decoration:none;padding:13px;border-radius:10px;border:1px solid var(--bd);background:var(--s2);color:var(--t2);font-size:14px;font-weight:700;cursor:pointer;font-family:var(--F)">🤔 Vai pensar</a>
     </div>`;
   const b=$('mod-save-btn'); if(b)b.style.display='none';
   $('MOD').classList.add('open');
@@ -2979,7 +2979,51 @@ function visitaFechou(id){
     <div class="fg"><label>📅 Data e Hora do Serviço</label><input class="fc" id="vf-data" type="datetime-local" value="${defDate}"></div>
     <div class="fg"><label>Endereço</label><input class="fc" id="vf-end" value="${endereco}" placeholder="Endereço do serviço"></div>
     <div class="fg"><label>Observações</label><textarea class="fc" id="vf-obs" rows="2" placeholder="O que foi vendido / detalhes">${ev.obs||''}</textarea></div>
-    <a href="#" onclick="return confirmarFechou('${id}',this);" style="display:block;text-align:center;text-decoration:none;width:100%;padding:12px;margin-top:6px;background:var(--green);border:none;border-radius:10px;color:#000;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--F);box-sizing:border-box">✅ Confirmar e Agendar</a>`;
+    <a href="#" onclick="confirmarFechou('${id}');return false;" style="display:block;text-align:center;text-decoration:none;width:100%;padding:12px;margin-top:6px;background:var(--green);border:none;border-radius:10px;color:#000;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--F);box-sizing:border-box">✅ Confirmar e Agendar</a>`;
+  const b=$('mod-save-btn'); if(b)b.style.display='none';
+  $('MOD').classList.add('open');
+}
+
+// ── IA: gera estratégia de reconquista / follow-up ──
+async function gerarEstrategiaIA(cli, situacao, motivo, obs){
+  try{
+    if(typeof chamarClaude!=='function') return '';
+    const prompt=`Empresa: Grupo Alianca Monitoramento (seguranca eletronica: cameras, alarmes, cerca eletrica, controle de acesso, monitoramento 24h).
+Cliente: ${cli}
+Situacao: ${situacao}
+Motivo: ${motivo}${obs?'\nDetalhes informados: '+obs:''}
+
+Voce e estrategista de vendas. Monte uma estrategia curta e pratica para a atendente Gilmara reconquistar/dar follow-up neste cliente por telefone ou WhatsApp.
+
+Regras da resposta:
+- Texto puro, SEM emojis, SEM asteriscos, SEM markdown.
+- Comece com 3 acoes objetivas, uma por linha, cada uma iniciando com "- ".
+- Depois uma linha comecando com "Abordagem: " seguida de uma frase pronta e natural para a Gilmara iniciar a conversa.
+- Maximo 80 palavras no total.`;
+    const r=await chamarClaude(prompt, 350);
+    return (r||'').trim();
+  }catch(e){ return ''; }
+}
+
+// ── Modal com a mensagem pronta + botão de toque pra abrir o WhatsApp da Gilmara ──
+function mostrarMsgGilmara(titulo, msg){
+  const url=`https://wa.me/${NUM_0800.tel}?text=${encodeURIComponent(msg)}`;
+  const safe=msg.replace(/[<>]/g,'');
+  $('mod-title').innerHTML=titulo;
+  $('mod-body').innerHTML=`
+    <div style="background:var(--s2);border:1px solid var(--bd);border-radius:9px;padding:12px;margin-bottom:12px;font-size:12px;color:var(--t2);white-space:pre-wrap;max-height:300px;overflow:auto;line-height:1.55">${safe}</div>
+    <a href="${url}" target="_blank" rel="noopener" onclick="setTimeout(function(){if(typeof M!=='undefined')M.close();},350)" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;background:#25D366;border-radius:10px;text-decoration:none;color:#000;font-weight:800;font-size:14px">Abrir WhatsApp da Gilmara</a>
+    <button onclick="M.close()" style="width:100%;margin-top:8px;padding:9px;background:transparent;border:1px solid var(--bd);border-radius:8px;color:var(--t3);font-size:12px;cursor:pointer;font-family:var(--F)">Fechar</button>`;
+  const b=$('mod-save-btn'); if(b)b.style.display='none';
+  $('MOD').classList.add('open');
+}
+
+// ── Loading da IA dentro do modal ──
+function _modalLoadingIA(titulo, txt){
+  $('mod-title').innerHTML=titulo;
+  $('mod-body').innerHTML=`<div style="display:flex;align-items:center;gap:12px;padding:22px;color:var(--t2)">
+    <div style="width:22px;height:22px;border:2px solid var(--bd);border-top-color:var(--gold);border-radius:50%;animation:spin 1s linear infinite"></div>
+    <span>${txt}</span></div>`;
   const b=$('mod-save-btn'); if(b)b.style.display='none';
   $('MOD').classList.add('open');
 }
@@ -2999,10 +3043,6 @@ function confirmarFechou(id, linkEl){
   if(dataRaw){const d=parseDateLocal(dataRaw); if(dataRaw.includes('T'))horaFmt=dataRaw.split('T')[1].slice(0,5); dataFmt=d.toLocaleDateString('pt-BR');}
   else {horaFmt=nowStr(); dataFmt=new Date().toLocaleDateString('pt-BR');}
   const titulo=tipoOSMap[tipo];
-
-  // 0) WhatsApp pra Gilmara (0800) — link real preparado ANTES de qualquer outra coisa, pra não ser bloqueado pelo navegador
-  const msg=`${EMO.check} *CLIENTE FECHOU — Grupo Aliança*\n\n${EMO.pessoa} ${cli}\n${EMO.clip} Serviço: ${titulo}\n${EMO.cal} Agendado: ${dataFmt} às ${horaFmt}\n${tec?EMO.worker+' Técnico: '+tec+'\n':''}${endereco?EMO.pin+' '+endereco+'\n':''}${obs?EMO.memo+' '+obs+'\n':''}\n${EMO.dedo} Gilmara, confirmar o agendamento com o cliente.\n\n— Sistema CRM ${EMO.escudo}`;
-  enviarWhats0800(msg);
 
   // 1) Remove a visita da agenda (concluída)
   _removerEvento(id);
@@ -3024,9 +3064,19 @@ function confirmarFechou(id, linkEl){
   DB.notifs.unshift({ic:'🎉',t:`Fechou: ${cli}`,sub:`${titulo} agendada p/ ${dataFmt} ${horaFmt}`,time:nowStr(),tipo:'unread'});
 
   rAgenda(); if(typeof rOS==='function')rOS(); rNotifs(); updKPI(); autoSave();
-  const b=$('mod-save-btn'); if(b)b.style.display=''; M.close();
 
-  toast(`🎉 Fechou! ${titulo} agendada e WhatsApp enviado p/ Gilmara.`);
+  // 5) Mensagem profissional (sem emojis) pra Gilmara confirmar com o cliente
+  let msg=`*CLIENTE FECHOU - Grupo Aliança*\n\n`;
+  msg+=`Cliente: ${cli}\n`;
+  msg+=`Serviço: ${titulo}\n`;
+  msg+=`Agendado: ${dataFmt} às ${horaFmt}\n`;
+  if(tec) msg+=`Técnico: ${tec}\n`;
+  if(endereco) msg+=`Endereço: ${endereco}\n`;
+  if(obs) msg+=`Observações: ${obs}\n`;
+  msg+=`\nGilmara, favor confirmar o agendamento com o cliente.\n\nGrupo Aliança Monitoramento`;
+
+  toast(`Fechou! ${titulo} agendada.`);
+  mostrarMsgGilmara('Cliente Fechou - Avisar Gilmara', msg);
   return false;
 }
 
@@ -3056,78 +3106,108 @@ function visitaNaoFechou(id){
         <option value="30">Em 30 dias</option>
       </select>
     </div>
-    <a href="#" onclick="return confirmarNaoFechou('${id}',this);" style="display:block;text-align:center;text-decoration:none;width:100%;padding:12px;margin-top:6px;background:var(--red);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--F);box-sizing:border-box">🎣 Enviar p/ Reconquista</a>`;
+    <a href="#" onclick="confirmarNaoFechou('${id}');return false;" style="display:block;text-align:center;text-decoration:none;width:100%;padding:12px;margin-top:6px;background:var(--red);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--F);box-sizing:border-box">🎣 Enviar p/ Reconquista</a>`;
   const b=$('mod-save-btn'); if(b)b.style.display='none';
   $('MOD').classList.add('open');
 }
 
-function confirmarNaoFechou(id, linkEl){
-  const {ev}=_acharEvento(id); if(!ev)return false;
+async function confirmarNaoFechou(id){
+  const {ev}=_acharEvento(id); if(!ev)return;
   const cli=ev.cli||'';
   const motivo=$('nf-motivo')?.value||'Outro';
   const obs=($('nf-obs')?.value||'').trim();
   const dias=parseInt($('nf-dias')?.value||'20');
   const emp=DB.empresas.find(e=>e.nome===cli);
+  const tel=emp?.tel?emp.tel.replace(/\D/g,''):'';
   const retorno=new Date(); retorno.setDate(retorno.getDate()+dias);
   const retornoFmt=retorno.toLocaleDateString('pt-BR');
   const retornoRaw=`${retorno.getFullYear()}-${String(retorno.getMonth()+1).padStart(2,'0')}-${String(retorno.getDate()).padStart(2,'0')}`;
 
-  // 0) WhatsApp pra Gilmara (0800) — link real preparado ANTES de qualquer outra coisa, pra não ser bloqueado pelo navegador
-  const tel=emp?.tel?emp.tel.replace(/\D/g,''):'';
-  const msg=`${EMO.peixe} *RECONQUISTA — Grupo Aliança*\n\n${EMO.pessoa} ${cli}\n${EMO.x} Não fechou na visita\n${EMO.interr} Motivo: *${motivo}*\n${obs?EMO.memo+' '+obs+'\n':''}${tel?EMO.fone+' WhatsApp cliente: '+tel+'\n':''}${EMO.cal} Retornar em: ${retornoFmt}\n\n${EMO.dedo} Gilmara, entrar em contato p/ tentar reconquistar esse cliente.\n\n— Sistema CRM ${EMO.escudo}`;
-  enviarWhats0800(msg);
-
   // 1) Remove a visita da agenda
   _removerEvento(id);
 
-  // 2) Deal no funil (entra no topo, stage 0) com flag de reconquista + motivo
-  DB.deals.push({id:uid(),emp:cli||'Cliente',val:'0',tag:'sv',stage:0,ini:'RC',cor:emp?.cor||'#ff8c42',reconquista:true,motivoPerda:motivo,obsPerda:obs,dataPerda:new Date().toLocaleDateString('pt-BR')});
+  // 2) Deal no funil (topo, stage 0) com flag de reconquista + motivo
+  const dealId=uid();
+  DB.deals.push({id:dealId,emp:cli||'Cliente',val:'0',tag:'sv',stage:0,ini:'RC',cor:emp?.cor||'#ff8c42',reconquista:true,motivoPerda:motivo,obsPerda:obs,dataPerda:new Date().toLocaleDateString('pt-BR')});
 
-  // 3) Tarefa de ligação da Gilmara
-  DB.tasks.push({id:uid(),txt:`🎣 Reconquistar ${cli} — motivo: ${motivo}${obs?'\n'+obs:''}`,due:retornoFmt,dataHora:retornoRaw,pri:'#ff8c42',pri2:'media',cliente:cli,resp:'Gilmara',done:false,per:'s',reconquista:true});
+  // 3) Tarefa de ligação da Gilmara (estratégia entra depois da IA)
+  const taskId=uid();
+  DB.tasks.push({id:taskId,txt:`Reconquistar ${cli} - motivo: ${motivo}${obs?' ('+obs+')':''}`,due:retornoFmt,dataHora:retornoRaw,pri:'#ff8c42',pri2:'media',cliente:cli,resp:'Gilmara',done:false,per:'s',reconquista:true});
 
   // 4) Histórico + notif + feed
-  adicionarEvento(cli,'venda',`❌ Não fechou — motivo: ${motivo}. Enviado p/ reconquista (retorno ${retornoFmt})`,'🎣');
-  DB.notifs.unshift({ic:'🎣',t:`Reconquista: ${cli}`,sub:`Motivo: ${motivo} · retornar ${retornoFmt}`,time:nowStr(),tipo:'unread'});
-  addFeed('🎣','rgba(255,140,66,.14)',`${cli} → funil de reconquista (${motivo})`);
+  adicionarEvento(cli,'venda',`Não fechou - motivo: ${motivo}. Enviado p/ reconquista (retorno ${retornoFmt})`,'🎣');
+  DB.notifs.unshift({ic:'🎣',t:`Reconquista: ${cli}`,sub:`Motivo: ${motivo} - retornar ${retornoFmt}`,time:nowStr(),tipo:'unread'});
+  addFeed('🎣','rgba(255,140,66,.14)',`${cli} para reconquista (${motivo})`);
+  rAgenda(); if(typeof rPipeline==='function')rPipeline(); if(typeof rTasks==='function')rTasks(); rNotifs(); updKPI();
 
-  rAgenda(); if(typeof rPipeline==='function')rPipeline(); if(typeof rTasks==='function')rTasks(); rNotifs(); updKPI(); autoSave();
-  const b=$('mod-save-btn'); if(b)b.style.display=''; M.close();
+  // 5) Loading enquanto a IA monta a estratégia
+  _modalLoadingIA('Reconquista - montando estratégia', `A IA está montando a estratégia de reconquista para ${cli}...`);
 
-  toast(`🎣 ${cli} enviado p/ reconquista! WhatsApp na Gilmara.`);
-  return false;
+  // 6) IA gera a estratégia com base no motivo
+  const estrategia=await gerarEstrategiaIA(cli,'Não fechou na visita',motivo,obs);
+
+  // 7) Salva a estratégia na tarefa e no deal
+  const t=DB.tasks.find(x=>String(x.id)===String(taskId));
+  if(t&&estrategia){ t.estrategia=estrategia; t.txt=t.txt+'\n\nESTRATEGIA IA:\n'+estrategia; }
+  const dd=DB.deals.find(x=>String(x.id)===String(dealId));
+  if(dd&&estrategia) dd.estrategiaIA=estrategia;
+  if(typeof rTasks==='function')rTasks(); autoSave();
+
+  // 8) Mensagem profissional (sem emojis) com a estratégia
+  let msg=`*RECONQUISTA - Grupo Aliança*\n\n`;
+  msg+=`Cliente: ${cli}\n`;
+  msg+=`Situação: Não fechou na visita\n`;
+  msg+=`Motivo: ${motivo}\n`;
+  if(obs) msg+=`Detalhes: ${obs}\n`;
+  if(tel) msg+=`WhatsApp do cliente: ${tel}\n`;
+  msg+=`Retornar até: ${retornoFmt}\n`;
+  if(estrategia) msg+=`\nESTRATÉGIA DE RECONQUISTA:\n${estrategia}\n`;
+  msg+=`\nGilmara, favor entrar em contato para reconquistar este cliente.\n\nGrupo Aliança Monitoramento`;
+
+  toast(`${cli} enviado para reconquista.`);
+  mostrarMsgGilmara('Reconquista - Avisar Gilmara', msg);
 }
 
-// ── Caminho 3: VAI PENSAR → retorno curto (3 dias) + tarefa + WhatsApp ──
-function visitaPensar(id, linkEl){
-  const {ev}=_acharEvento(id); if(!ev)return false;
+// ── Caminho 3: VAI PENSAR → retorno curto (3 dias) + IA follow-up + WhatsApp ──
+async function visitaPensar(id){
+  const {ev}=_acharEvento(id); if(!ev)return;
   const cli=ev.cli||'';
   const emp=DB.empresas.find(e=>e.nome===cli)||{};
+  const tel=emp?.tel?emp.tel.replace(/\D/g,''):'';
   const r=new Date(); r.setDate(r.getDate()+3);
   const rFmt=r.toLocaleDateString('pt-BR');
   const rRaw=`${r.getFullYear()}-${String(r.getMonth()+1).padStart(2,'0')}-${String(r.getDate()).padStart(2,'0')}`;
 
-  // 0) WhatsApp pra Gilmara (0800) — link real preparado ANTES de qualquer outra coisa, pra não ser bloqueado pelo navegador
-  const tel=emp?.tel?emp.tel.replace(/\D/g,''):'';
-  const msg=`${EMO.pensa} *CLIENTE VAI PENSAR — Grupo Aliança*\n\n${EMO.pessoa} ${cli}\n${EMO.telefone} Ficou de pensar na visita\n${tel?EMO.fone+' WhatsApp cliente: '+tel+'\n':''}${EMO.cal} Retornar em: ${rFmt}\n\n${EMO.dedo} Gilmara, dar um retorno leve nesse cliente.\n\n— Sistema CRM ${EMO.escudo}`;
-  enviarWhats0800(msg);
-
   _removerEvento(id);
 
-  const novoEv={id:uid(),h:'09:00',data:rFmt,dataRaw:rRaw+'T09:00',t:`📞 Retorno — ${cli}`,tipo:'ligacao',tec:'',sub:cli+' · vai pensar',c:'#b08fff',obs:'Cliente ficou de pensar na visita',cli};
+  const novoEv={id:uid(),h:'09:00',data:rFmt,dataRaw:rRaw+'T09:00',t:`Retorno - ${cli}`,tipo:'ligacao',tec:'',sub:cli+' - vai pensar',c:'#b08fff',obs:'Cliente ficou de pensar na visita',cli};
   const hoje=new Date().toLocaleDateString('pt-BR');
   if(rFmt===hoje)DB.agenda.h.unshift(novoEv); else {DB.agenda.s.unshift(novoEv);DB.agenda.s.sort((a,b)=>new Date(a.dataRaw||0)-new Date(b.dataRaw||0));}
 
-  DB.tasks.push({id:uid(),txt:`📞 Retornar ${cli} — ficou de pensar`,due:rFmt,dataHora:rRaw,pri:'#b08fff',pri2:'media',cliente:cli,resp:'Gilmara',done:false,per:'s'});
+  const taskId=uid();
+  DB.tasks.push({id:taskId,txt:`Retornar ${cli} - ficou de pensar`,due:rFmt,dataHora:rRaw,pri:'#b08fff',pri2:'media',cliente:cli,resp:'Gilmara',done:false,per:'s'});
 
-  adicionarEvento(cli,'venda',`🤔 Ficou de pensar na visita. Retorno agendado p/ ${rFmt}`,'📞');
-  DB.notifs.unshift({ic:'📞',t:`Retorno: ${cli}`,sub:`Vai pensar · ligar em ${rFmt}`,time:nowStr(),tipo:'unread'});
+  adicionarEvento(cli,'venda',`Ficou de pensar na visita. Retorno agendado p/ ${rFmt}`,'📞');
+  DB.notifs.unshift({ic:'📞',t:`Retorno: ${cli}`,sub:`Vai pensar - ligar em ${rFmt}`,time:nowStr(),tipo:'unread'});
+  rAgenda(); if(typeof rTasks==='function')rTasks(); rNotifs(); updKPI();
 
-  rAgenda(); if(typeof rTasks==='function')rTasks(); rNotifs(); updKPI(); autoSave();
-  const b=$('mod-save-btn'); if(b)b.style.display=''; M.close();
+  _modalLoadingIA('Follow-up - montando abordagem', `A IA está montando a abordagem de follow-up para ${cli}...`);
 
-  toast(`📞 Retorno de ${cli} agendado p/ ${rFmt}. WhatsApp na Gilmara.`);
-  return false;
+  const estrategia=await gerarEstrategiaIA(cli,'Cliente ficou de pensar (ainda decidindo)','Ficou de pensar',ev.obs||'');
+  const t=DB.tasks.find(x=>String(x.id)===String(taskId));
+  if(t&&estrategia){ t.estrategia=estrategia; t.txt=t.txt+'\n\nABORDAGEM IA:\n'+estrategia; }
+  if(typeof rTasks==='function')rTasks(); autoSave();
+
+  let msg=`*FOLLOW-UP - Grupo Aliança*\n\n`;
+  msg+=`Cliente: ${cli}\n`;
+  msg+=`Situação: Ficou de pensar na visita\n`;
+  if(tel) msg+=`WhatsApp do cliente: ${tel}\n`;
+  msg+=`Retornar até: ${rFmt}\n`;
+  if(estrategia) msg+=`\nABORDAGEM SUGERIDA:\n${estrategia}\n`;
+  msg+=`\nGilmara, dar um retorno leve neste cliente.\n\nGrupo Aliança Monitoramento`;
+
+  toast(`Retorno de ${cli} agendado p/ ${rFmt}.`);
+  mostrarMsgGilmara('Follow-up - Avisar Gilmara', msg);
 }
 
 
