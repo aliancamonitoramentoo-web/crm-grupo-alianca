@@ -9012,8 +9012,20 @@ const EQUIPE_NUMEROS = [
 const NUM_0800 = { nome:'Gilmara (0800)', tel:'558000003813' };
 function enviarWhats0800(msg){
   const url=`https://wa.me/${NUM_0800.tel}?text=${encodeURIComponent(msg)}`;
-  // Abre imediatamente dentro do clique do usuário (não é bloqueado)
-  window.open(url,'_blank','noopener');
+  let w=null;
+  try{ w=window.open(url,'_blank','noopener'); }catch(e){}
+  if(!w){
+    // Se o navegador bloqueou, mostra botão garantido para tocar
+    const old=document.getElementById('wa-0800-fb'); if(old)old.remove();
+    const d=document.createElement('div');
+    d.id='wa-0800-fb';
+    d.style.cssText='position:fixed;bottom:22px;right:22px;z-index:999999;background:#0E0E10;border:2px solid #25D366;border-radius:14px;padding:16px;max-width:300px;box-shadow:0 12px 34px rgba(0,0,0,.65)';
+    d.innerHTML=`<div style="color:#25D366;font-weight:800;font-size:13px;margin-bottom:9px">💬 Avisar Gilmara (0800)</div>
+      <a href="${url}" target="_blank" rel="noopener" onclick="var e=document.getElementById('wa-0800-fb');if(e)e.remove();" style="display:block;text-align:center;padding:13px;background:#25D366;color:#000;font-weight:800;border-radius:10px;text-decoration:none;font-size:14px">📱 Abrir WhatsApp da Gilmara</a>
+      <button onclick="var e=document.getElementById('wa-0800-fb');if(e)e.remove();" style="width:100%;margin-top:8px;padding:7px;background:transparent;border:1px solid #333;color:#888;border-radius:8px;font-size:11px;cursor:pointer;font-family:var(--F)">Fechar</button>`;
+    document.body.appendChild(d);
+    setTimeout(()=>{const x=document.getElementById('wa-0800-fb');if(x)x.remove();},60000);
+  }
 }
 
 // Envia WhatsApp para toda a equipe — mostra botões separados
