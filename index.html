@@ -3074,8 +3074,9 @@ function rCobrancas(){
         </div>
       </div>
       <div style="display:flex;gap:6px;margin-top:10px;border-top:1px solid var(--bd);padding-top:9px;flex-wrap:wrap">
-        ${!c.pago?`<button class="btn sm" style="background:rgba(0,217,126,.12);color:var(--green);border:1px solid rgba(0,217,126,.3);flex:1;justify-content:center" onclick="marcarPago(${c.id})">✅ Marcar como Pago</button>`:''}
-        ${!c.pago&&c.cliente?`<button class="btn bgh sm" onclick="cobrarWhatsApp(${c.id})">💬 Cobrar WhatsApp</button>`:''}
+        ${!c.pago?`<button class="btn sm" style="background:rgba(0,217,126,.12);color:var(--green);border:1px solid rgba(0,217,126,.3);flex:1;justify-content:center" onclick="marcarPago(${c.id})">✅ Pago Total</button>`:''}
+        ${!c.pago?`<button class="btn sm" style="background:rgba(61,155,255,.12);color:var(--blue);border:1px solid rgba(61,155,255,.3);flex:1;justify-content:center" onclick="pagarParcial(${c.id})">💳 Parcial / Abater</button>`:''}
+        ${!c.pago&&c.cliente?`<button class="btn bgh sm" onclick="cobrarWhatsApp(${c.id})">💬 WhatsApp</button>`:''}
         <button class="btn bgh sm" onclick="editarCobranca(${c.id})">✏️</button>
         <button class="btn br sm adm" onclick="delCobranca(${c.id})">🗑️</button>
       </div>
@@ -3151,6 +3152,94 @@ function marcarPago(id){
   adicionarEvento(c.cliente,'fin',`Pagamento recebido: ${fmtR(c.valor)}`,'✅');
   rCobrancas();rFinanceiro();rNotifs();updKPI();autoSave();
   toast(`✅ ${fmtR(c.valor)} marcado como pago e lançado no financeiro!`);
+}
+
+// ── PAGAMENTO PARCIAL / ABATER ──────────────
+function pagarParcial(id){
+  const c=DB.cobrancas?.find(x=>x.id===id); if(!c) return;
+  const devido=parseFloat(c.valor||0)||0;
+  $('mod-title').innerHTML='💳 Registrar Pagamento — '+(c.cliente||'');
+  $('mod-body').innerHTML=`
+    <div style="background:rgba(61,155,255,.08);border:1px solid rgba(61,155,255,.25);border-radius:9px;padding:11px;margin-bottom:12px">
+      <div style="font-size:11px;color:var(--t2)">${c.descricao||'Cobrança'}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+        <span style="font-size:12px;color:var(--t3)">Valor devido</span>
+        <span style="font-size:20px;font-weight:900;color:var(--t1);font-family:var(--M)">${fmtR(devido)}</span>
+      </div>
+    </div>
+    <div class="fg">
+      <label>💰 Quanto o cliente pagou agora? (R$)</label>
+      <input class="fc" id="pp-val" type="number" step="0.01" min="0" placeholder="Ex: 50,00" oninput="ppCalc(${devido})" autofocus>
+    </div>
+    <div id="pp-preview" style="display:none;border-radius:9px;padding:11px;margin-top:2px;font-size:12px;background:var(--s2);border:1px solid var(--bd)"></div>`;
+  $('mod-save-btn').textContent='✅ Confirmar Pagamento';
+  $('mod-save-btn').onclick=()=>confirmarPagamentoParcial(id);
+  $('MOD').classList.add('open');
+  setTimeout(()=>{const i=$('pp-val');if(i)i.focus();},100);
+}
+
+function ppCalc(devido){
+  const pago=parseFloat($('pp-val')?.value||'0')||0;
+  const box=$('pp-preview'); if(!box) return;
+  if(pago<=0){box.style.display='none';return;}
+  box.style.display='block';
+  const rest=devido-pago;
+  if(Math.abs(rest)<0.005){
+    box.innerHTML=`<div style="color:var(--green);font-weight:700;text-align:center">✅ Pagamento integral — a cobrança será quitada.</div>`;
+  }else if(rest>0){
+    box.innerHTML=`
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="color:var(--t3)">Pago agora</span><span style="color:var(--green);font-weight:800">${fmtR(pago)}</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--t3)">Fica devendo</span><span style="color:var(--orange);font-weight:800">${fmtR(rest)}</span></div>
+      <div style="font-size:10.5px;color:var(--t3);margin-top:7px;border-top:1px dashed var(--bd);padding-top:6px">A cobrança continua <b>pendente</b> com o restante de ${fmtR(rest)}.</div>`;
+  }else{
+    const troco=-rest;
+    box.innerHTML=`
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="color:var(--t3)">Quita a cobrança</span><span style="color:var(--green);font-weight:800">${fmtR(devido)}</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--t3)">Crédito / adiantamento</span><span style="color:var(--blue);font-weight:800">${fmtR(troco)}</span></div>
+      <div style="font-size:10.5px;color:var(--t3);margin-top:7px;border-top:1px dashed var(--bd);padding-top:6px">Cobrança <b>quitada</b>. O excedente de ${fmtR(troco)} entra como crédito do cliente.</div>`;
+  }
+}
+
+function confirmarPagamentoParcial(id){
+  const c=DB.cobrancas?.find(x=>x.id===id); if(!c) return;
+  const devido=parseFloat(c.valor||0)||0;
+  const pago=parseFloat($('pp-val')?.value||'0')||0;
+  if(pago<=0){toast('⚠️ Informe o valor pago!');return;}
+  const hojeStr=new Date().toLocaleDateString('pt-BR');
+  const rest=devido-pago;
+
+  // Lança SEMPRE o valor real recebido no financeiro (valores corretos)
+  DB.movs.unshift({id:uid(),tipo:'in',val:String(pago),desc:`💸 Pagamento — ${c.cliente}`,ref:`${c.descricao} · ${hojeStr}${rest>0.005?' (parcial)':(rest<-0.005?' (com crédito)':'')}`});
+
+  if(Math.abs(rest)<0.005){
+    // Pagou o valor exato — quita
+    c.pago=true; c.pagoEm=hojeStr;
+    DB.notifs.unshift({ic:'✅',t:`Pago: ${c.cliente}`,sub:`${fmtR(pago)} recebido em ${hojeStr}`,time:nowStr(),tipo:'unread'});
+    adicionarEvento(c.cliente,'fin',`Pagamento recebido: ${fmtR(pago)}`,'✅');
+    toast(`✅ ${fmtR(pago)} pago e lançado no financeiro!`);
+  }else if(rest>0){
+    // Pagou menos — abate e mantém pendente com o restante
+    c.valor=Number(rest.toFixed(2));
+    c.pagoParcial=Number(((parseFloat(c.pagoParcial||0)||0)+pago).toFixed(2));
+    c.obs=`${c.obs?c.obs+' · ':''}Pagou ${fmtR(pago)} em ${hojeStr}, restam ${fmtR(rest)}`;
+    DB.notifs.unshift({ic:'💳',t:`Parcial: ${c.cliente}`,sub:`${fmtR(pago)} recebido · restam ${fmtR(rest)}`,time:nowStr(),tipo:'unread'});
+    adicionarEvento(c.cliente,'fin',`Pagamento parcial: ${fmtR(pago)} (restam ${fmtR(rest)})`,'💳');
+    toast(`💳 ${fmtR(pago)} abatido! Restam ${fmtR(rest)} na cobrança.`);
+  }else{
+    // Pagou mais — quita e gera crédito do cliente
+    const troco=Number((-rest).toFixed(2));
+    c.pago=true; c.pagoEm=hojeStr;
+    c.obs=`${c.obs?c.obs+' · ':''}Pagou ${fmtR(pago)} em ${hojeStr} — crédito de ${fmtR(troco)}`;
+    const emp=DB.empresas.find(e=>e.nome===c.cliente);
+    if(emp){emp.credito=Number(((parseFloat(emp.credito||0)||0)+troco).toFixed(2));}
+    DB.notifs.unshift({ic:'💰',t:`Pago + crédito: ${c.cliente}`,sub:`${fmtR(pago)} recebido · crédito ${fmtR(troco)}`,time:nowStr(),tipo:'unread'});
+    adicionarEvento(c.cliente,'fin',`Pagamento ${fmtR(pago)} — crédito de ${fmtR(troco)} gerado`,'💰');
+    toast(`💰 Cobrança quitada! Crédito de ${fmtR(troco)} para ${c.cliente}.`);
+  }
+
+  rCobrancas();rFinanceiro();rNotifs();updKPI();autoSave();
+  $('mod-save-btn').textContent='Salvar';$('mod-save-btn').onclick=()=>M.save();
+  M.close();
 }
 
 function cobrarWhatsApp(id){
