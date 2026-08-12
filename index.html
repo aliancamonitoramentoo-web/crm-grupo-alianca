@@ -312,7 +312,7 @@ tr:hover td{background:rgba(255,255,255,.017);}
 <div class="sb" id="SIDEBAR">
   <!-- Botão fechar no mobile -->
   <button onclick="toggleSidebar()" style="display:none;position:absolute;top:10px;right:10px;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:18px;width:32px;height:32px;border-radius:8px;cursor:pointer;align-items:center;justify-content:center;z-index:10" id="mob-close-btn">✕</button>
-  <div class="slogo"><div class="smark">⚡</div><div><div class="sname">Aliance <span style="font-size:9px;color:#00d97e;font-weight:700;background:rgba(0,217,126,.12);padding:1px 6px;border-radius:6px;vertical-align:middle">v48 completo</span></div><div class="ssub">Gerencie clientes. Feche mais negócios.</div></div></div>
+  <div class="slogo"><div class="smark">⚡</div><div><div class="sname">Aliance <span style="font-size:9px;color:#00d97e;font-weight:700;background:rgba(0,217,126,.12);padding:1px 6px;border-radius:6px;vertical-align:middle">v51 saídas</span></div><div class="ssub">Gerencie clientes. Feche mais negócios.</div></div></div>
   <nav id="NAV">
 
     <!-- ── PRINCIPAL (colapsável) ── -->
@@ -1658,6 +1658,12 @@ function rDashContratosTipo(){
       <div style="font-size:24px;font-weight:900;color:var(--gold);font-family:var(--M)">${fmtR(totalGeral)}</div>
       <div style="font-size:11px;color:var(--t2);margin-top:3px">${ativos.length} contratos ativos</div>
     </div>`;
+}
+
+// ── Mostra categoria só quando for Saída ──
+function movTipoChange(){
+  const t=$('f0')?.value;
+  const w=$('mov-cat-wrap'); if(w) w.style.display=(t==='out')?'block':'none';
 }
 
 // ── Alerta de fila de reconquista da Gilmara (no Dashboard) ──
@@ -3438,7 +3444,7 @@ function rCobrancas(){
       </div>
       <div style="display:flex;gap:6px;margin-top:10px;border-top:1px solid var(--bd);padding-top:9px;flex-wrap:wrap">
         ${!c.pago?`<button class="btn sm" style="background:rgba(0,217,126,.12);color:var(--green);border:1px solid rgba(0,217,126,.3);flex:1;justify-content:center" onclick="marcarPago(${c.id})">✅ Pago Total</button>`:''}
-        ${!c.pago?`<button class="btn sm" style="background:rgba(61,155,255,.12);color:var(--blue);border:1px solid rgba(61,155,255,.3);flex:1;justify-content:center" onclick="pagarParcial(${c.id})">💳 Parcial / Abater</button>`:''}
+        ${!c.pago?`<button class="btn sm" style="background:rgba(61,155,255,.12);color:var(--blue);border:1px solid rgba(61,155,255,.3);flex:1;justify-content:center" onclick="registrarPagamento(${c.id})">💰 Registrar Pagamento</button>`:''}
         ${!c.pago&&c.cliente&&(parseFloat((DB.empresas.find(e=>e.nome===c.cliente)||{}).credito||0)||0)>0?`<button class="btn sm" style="background:rgba(61,155,255,.15);color:var(--blue);border:1px solid rgba(61,155,255,.35);flex:1;justify-content:center" onclick="usarCredito(${c.id})">💳 Usar crédito</button>`:''}
         ${!c.pago&&c.cliente?`<button class="btn bgh sm" onclick="cobrarWhatsApp(${c.id})">💬 WhatsApp</button>`:''}
         <button class="btn bgh sm" onclick="editarCobranca(${c.id})">✏️</button>
@@ -3539,6 +3545,107 @@ function usarCredito(id){
   }
   adicionarEvento(c.cliente,'fin',`Crédito usado: ${fmtR(usar)} na cobrança${emp.credito>0?' (saldo restante '+fmtR(emp.credito)+')':''}`,'💳');
   rCobrancas(); if(typeof rClientes==='function')rClientes(); updKPI(); autoSave();
+}
+
+// ── PAGAMENTO DIVIDIDO EM VÁRIAS FORMAS (misto) ──────────────
+let _pgLinhas=[], _pgCobId=null;
+const FORMAS_PAG=['PIX','Dinheiro','Cartão de Crédito','Cartão de Débito','Transferência','Boleto','Cheque'];
+function registrarPagamento(id){
+  const c=DB.cobrancas?.find(x=>String(x.id)===String(id)); if(!c)return;
+  const devido=parseFloat(c.valor||0)||0;
+  _pgCobId=String(id);
+  _pgLinhas=[{forma:'PIX', val:devido}];
+  renderPgModal(devido, c);
+}
+function renderPgModal(devido, c){
+  const somado=_pgLinhas.reduce((a,l)=>a+(parseFloat(l.val)||0),0);
+  const rest=devido-somado;
+  let statusTxt='', statusCor='';
+  if(Math.abs(rest)<0.005){ statusTxt='Valor exato ✓'; statusCor='var(--green)'; }
+  else if(rest>0){ statusTxt=`Faltam ${fmtR(rest)} (fica pendente)`; statusCor='var(--orange)'; }
+  else { statusTxt=`${fmtR(-rest)} a mais (vira crédito)`; statusCor='var(--blue)'; }
+  $('mod-title').innerHTML='💰 Registrar Pagamento';
+  $('mod-body').innerHTML=`
+    <div style="background:var(--s2);border-radius:9px;padding:11px;margin-bottom:12px">
+      <div style="font-size:11px;color:var(--t3)">${(c?.descricao||'Cobrança')} — ${c?.cliente||''}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+        <span style="font-size:12px;color:var(--t3)">Total devido</span>
+        <span style="font-size:20px;font-weight:900;font-family:var(--M)">${fmtR(devido)}</span>
+      </div>
+    </div>
+    <label style="font-size:11px;color:var(--t3);font-weight:700">Formas de pagamento</label>
+    <div id="pg-linhas" style="margin:8px 0">
+      ${_pgLinhas.map((l,i)=>`
+        <div style="display:flex;gap:6px;margin-bottom:7px;align-items:center">
+          <select class="fc" style="flex:1.2" onchange="_pgLinhas[${i}].forma=this.value">
+            ${FORMAS_PAG.map(f=>`<option${f===l.forma?' selected':''}>${f}</option>`).join('')}
+          </select>
+          <input class="fc" style="flex:1" type="number" step="0.01" min="0" value="${l.val}" placeholder="0,00" oninput="_pgLinhas[${i}].val=this.value;pgRecalc(${devido})">
+          ${_pgLinhas.length>1?`<button onclick="_pgLinhas.splice(${i},1);renderPgModal(${devido},DB.cobrancas.find(x=>String(x.id)===String(_pgCobId)))" style="width:30px;height:30px;border-radius:7px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.1);color:#ef4444;cursor:pointer;flex-shrink:0;font-family:var(--F)">✕</button>`:''}
+        </div>`).join('')}
+    </div>
+    <button onclick="_pgLinhas.push({forma:'Dinheiro',val:0});renderPgModal(${devido},DB.cobrancas.find(x=>String(x.id)===String(_pgCobId)))" style="width:100%;padding:8px;background:var(--s3);border:1px dashed var(--bd);border-radius:8px;color:var(--t2);font-size:12px;cursor:pointer;font-family:var(--F);margin-bottom:10px">+ Adicionar forma</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 11px;background:var(--s2);border-radius:9px;margin-bottom:12px">
+      <span style="font-size:12px;color:var(--t3)">Somado</span>
+      <div style="text-align:right">
+        <div style="font-size:15px;font-weight:800;font-family:var(--M)" id="pg-somado">${fmtR(somado)}</div>
+        <div style="font-size:10.5px;color:${statusCor};font-weight:700" id="pg-status">${statusTxt}</div>
+      </div>
+    </div>
+    <button onclick="confirmarPagamentoMisto()" style="width:100%;padding:12px;background:var(--green);border:none;border-radius:10px;color:#000;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--F)">Confirmar Pagamento</button>`;
+  const b=$('mod-save-btn'); if(b)b.style.display='none';
+  $('MOD').classList.add('open');
+}
+function pgRecalc(devido){
+  const somado=_pgLinhas.reduce((a,l)=>a+(parseFloat(l.val)||0),0);
+  const rest=devido-somado;
+  const se=$('pg-somado'); if(se)se.textContent=fmtR(somado);
+  const st=$('pg-status'); if(st){
+    if(Math.abs(rest)<0.005){ st.textContent='Valor exato ✓'; st.style.color='var(--green)'; }
+    else if(rest>0){ st.textContent=`Faltam ${fmtR(rest)} (fica pendente)`; st.style.color='var(--orange)'; }
+    else { st.textContent=`${fmtR(-rest)} a mais (vira crédito)`; st.style.color='var(--blue)'; }
+  }
+}
+function confirmarPagamentoMisto(){
+  const c=DB.cobrancas?.find(x=>String(x.id)===String(_pgCobId)); if(!c)return;
+  const devido=parseFloat(c.valor||0)||0;
+  const linhas=_pgLinhas.filter(l=>(parseFloat(l.val)||0)>0);
+  if(!linhas.length){ toast('⚠️ Informe pelo menos um valor.'); return; }
+  const somado=linhas.reduce((a,l)=>a+(parseFloat(l.val)||0),0);
+  const hojeStr=new Date().toLocaleDateString('pt-BR');
+  const rest=devido-somado;
+
+  // Lança cada forma separada no financeiro
+  linhas.forEach(l=>{
+    const v=parseFloat(l.val)||0;
+    DB.movs.unshift({id:uid(),tipo:'in',val:String(v),desc:`💸 Pagamento (${l.forma}) — ${c.cliente}`,ref:`${c.descricao} · ${hojeStr}`});
+  });
+  // Salva o detalhamento na cobrança
+  c.pagamentos=(c.pagamentos||[]).concat(linhas.map(l=>({forma:l.forma,val:parseFloat(l.val)||0,data:hojeStr})));
+  const resumoFormas=linhas.map(l=>`${l.forma}: ${fmtR(parseFloat(l.val)||0)}`).join(' + ');
+
+  if(Math.abs(rest)<0.005){
+    c.pago=true; c.pagoEm=hojeStr;
+    c.obs=`${c.obs?c.obs+' · ':''}Pago em ${hojeStr} (${resumoFormas})`;
+    toast(`✅ Pago! ${resumoFormas}`);
+  } else if(rest>0){
+    c.valor=Number(rest.toFixed(2));
+    c.obs=`${c.obs?c.obs+' · ':''}Pagou ${fmtR(somado)} em ${hojeStr} (${resumoFormas}), restam ${fmtR(rest)}`;
+    toast(`💳 ${fmtR(somado)} recebido. Restam ${fmtR(rest)}.`);
+  } else {
+    const troco=Number((-rest).toFixed(2));
+    c.pago=true; c.pagoEm=hojeStr;
+    const emp=DB.empresas.find(e=>e.nome===c.cliente);
+    if(emp) emp.credito=Number(((parseFloat(emp.credito||0)||0)+troco).toFixed(2));
+    c.obs=`${c.obs?c.obs+' · ':''}Pago ${fmtR(somado)} em ${hojeStr} (${resumoFormas}) - crédito ${fmtR(troco)}`;
+    toast(`💰 Pago! Crédito de ${fmtR(troco)} para ${c.cliente}.`);
+  }
+  DB.notifs.unshift({ic:'💰',t:`Pago: ${c.cliente}`,sub:resumoFormas,time:nowStr(),tipo:'unread'});
+  adicionarEvento(c.cliente,'fin',`Pagamento recebido (${resumoFormas})`,'💰');
+  _pgLinhas=[]; _pgCobId=null;
+  const b=$('mod-save-btn'); if(b)b.style.display='';
+  M.close();
+  rCobrancas(); rFinanceiro(); if(typeof rClientes==='function')rClientes(); rNotifs(); updKPI(); autoSave();
 }
 
 // ── PAGAMENTO PARCIAL / ABATER ──────────────
@@ -4404,9 +4511,10 @@ const MFRM={
   <div class="fg2"><div class="fg"><label>Login *</label><input class="fc" id="f2" placeholder="usuario.login"></div><div class="fg"><label>Senha *</label><input class="fc" id="f3" type="password" placeholder="mín. 4 caracteres"></div></div>
   <div style="font-size:11px;color:var(--t2);background:var(--s2);padding:9px;border-radius:8px;margin-top:4px">💡 Login disponível imediatamente. Edite nome/login/senha diretamente na tela de Usuários.</div>`,
 
-  mov:`<div class="fg2"><div class="fg"><label>Tipo *</label><select class="fc" id="f0"><option value="in">💰 Entrada</option><option value="out">💸 Saída</option></select></div><div class="fg"><label>Valor (R$) *</label><input class="fc" id="f1" placeholder="1000"></div></div>
-  <div class="fg"><label>Descrição</label><input class="fc" id="f2" placeholder="Ex: Mensalidade cliente X"></div>
-  <div class="fg"><label>Referência</label><input class="fc" id="f3" placeholder="Ex: Fatura Mai/2026"></div>`,
+  mov:`<div class="fg2"><div class="fg"><label>Tipo *</label><select class="fc" id="f0" onchange="movTipoChange()"><option value="in">💰 Entrada</option><option value="out">💸 Saída</option></select></div><div class="fg"><label>Valor (R$) *</label><input class="fc" id="f1" placeholder="1000"></div></div>
+  <div class="fg" id="mov-cat-wrap" style="display:none"><label>Categoria da saída</label><select class="fc" id="f4"><option>Combustível</option><option>Equipamento / Material</option><option>Salário / Mão de obra</option><option>Aluguel</option><option>Internet / Telefone</option><option>Ferramentas</option><option>Manutenção de veículo</option><option>Impostos / Taxas</option><option>Marketing / Anúncios</option><option>Fornecedor</option><option>Outros</option></select></div>
+  <div class="fg"><label>Descrição</label><input class="fc" id="f2" placeholder="Ex: Gasolina da van, compra de câmeras..."></div>
+  <div class="fg"><label>Referência</label><input class="fc" id="f3" placeholder="Ex: Maio/2026, Nota 123..."></div>`,
 
   tecnico:`
     <div class="fg"><label>Nome Completo *</label><input class="fc" id="f0" placeholder="Ex: Adenilson Silva"></div>
@@ -4711,9 +4819,15 @@ const M={
     }else if(_mtype==='mov'){
       const tipo=gv('f0'),valRaw=gv('f1');
       if(!valRaw){toast('⚠️ Informe o valor!');return;}
-      const val=parseInt(valRaw.replace(/\D/g,''))||0;
-      DB.movs.unshift({id:uid(),tipo,val:String(val),desc:gv('f2'),ref:gv('f3')});
-      rFinanceiro();updKPI();autoSave();M.close();toast('✅ Lançamento registrado!');return;
+      // valor em reais inteiros (pega a parte antes da vírgula, remove pontos de milhar)
+      const val=parseInt(String(valRaw).replace(/\./g,'').split(',')[0].replace(/\D/g,''))||0;
+      if(val<=0){toast('⚠️ Valor inválido!');return;}
+      const cat=(tipo==='out')?(gv('f4')||'Outros'):'';
+      let desc=gv('f2')||'';
+      if(tipo==='out'&&cat) desc=desc?`[${cat}] ${desc}`:cat;
+      DB.movs.unshift({id:uid(),tipo,val:String(val),desc,ref:gv('f3'),cat});
+      rFinanceiro();updKPI();autoSave();M.close();
+      toast(tipo==='out'?`💸 Saída de ${fmtR(val)} registrada!`:`💰 Entrada de ${fmtR(val)} registrada!`);return;
 
     }else if(_mtype==='tecnico'){
       const nome=($('f0')?.value||'').trim();if(!nome){toast('⚠️ Informe o nome completo!');return;}
@@ -7714,6 +7828,7 @@ async function jbEnviar(manual=false){
       comprasClientes: DB.comprasClientes||{},
       tecnicos:      DB.tecnicos||[],
       movs:          DB.movs||[],
+      agenda:        DB.agenda||{h:[],s:[]},
       historico:     DB.historico||{},
       _users:        USERS.map(u=>({...u})),
       _deleted:      DB._deleted||{},
@@ -7773,6 +7888,20 @@ function mergeDB(local, nuvem){
     const somenteLocal=locArr.filter(x=>!idsNuvem.has(x.id)&&!deleted[x.id]);
     local[k]=[...nuvFiltrado, ...somenteLocal];
   });
+
+  // Merge da AGENDA (estrutura especial {h:[], s:[]}) — nunca apaga eventos locais
+  if(nuvem.agenda){
+    if(!local.agenda||typeof local.agenda!=='object') local.agenda={h:[],s:[]};
+    ['h','s'].forEach(sub=>{
+      const locArr=Array.isArray(local.agenda[sub])?local.agenda[sub]:[];
+      const nuvArr=Array.isArray(nuvem.agenda[sub])?nuvem.agenda[sub]:[];
+      if(nuvArr.length===0 && locArr.length>0){ local.agenda[sub]=locArr.filter(x=>!deleted[x.id]); return; }
+      const nuvFiltrado=nuvArr.filter(x=>!deleted[x.id]);
+      const idsNuvem=new Set(nuvFiltrado.map(x=>String(x.id)));
+      const somenteLocal=locArr.filter(x=>!idsNuvem.has(String(x.id))&&!deleted[x.id]);
+      local.agenda[sub]=[...nuvFiltrado, ...somenteLocal];
+    });
+  }
 
   const camposObj=['equips','historico','comprasClientes'];
   camposObj.forEach(k=>{
@@ -7867,6 +7996,7 @@ async function jbReceber(){
 
     // Atualiza telas abertas
     rTopCli(); rPipeline(); rClientes(); rOS(); rTasks(); rContratos(); rNotifs();
+    if(typeof rAgenda==='function') rAgenda();
     if(typeof rOrcamentos==='function') rOrcamentos();
     if(typeof rDashMetas==='function') rDashMetas();
     if(typeof rCobrancas==='function') rCobrancas();
