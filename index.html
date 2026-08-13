@@ -396,7 +396,7 @@ body.naoadmin .adm:not(.nav-group){display:none;}
 <div class="sb" id="SIDEBAR">
   <!-- Botão fechar no mobile -->
   <button onclick="toggleSidebar()" style="display:none;position:absolute;top:10px;right:10px;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:18px;width:32px;height:32px;border-radius:8px;cursor:pointer;align-items:center;justify-content:center;z-index:10" id="mob-close-btn">✕</button>
-  <div class="slogo"><div class="smark">⚡</div><div><div class="sname">Aliance <span style="font-size:9px;color:#00d97e;font-weight:700;background:rgba(0,217,126,.12);padding:1px 6px;border-radius:6px;vertical-align:middle">v60 vendas</span></div><div class="ssub">Gerencie clientes. Feche mais negócios.</div></div></div>
+  <div class="slogo"><div class="smark">⚡</div><div><div class="sname">Aliance <span style="font-size:9px;color:#00d97e;font-weight:700;background:rgba(0,217,126,.12);padding:1px 6px;border-radius:6px;vertical-align:middle">v61 boleto-parc</span></div><div class="ssub">Gerencie clientes. Feche mais negócios.</div></div></div>
   <button id="btn-instalar-app" onclick="instalarApp()" style="display:flex;align-items:center;justify-content:center;gap:7px;width:calc(100% - 24px);margin:0 12px 8px;padding:9px;background:linear-gradient(135deg,var(--red),#b3161d);border:none;border-radius:10px;color:#fff;font-size:12px;font-weight:800;cursor:pointer;font-family:var(--F)">📲 Instalar como App</button>
   <nav id="NAV">
 
@@ -3559,7 +3559,7 @@ let _vLinhas=[];
 const V_FORMAS=['PIX','Dinheiro','Cartão de Crédito','Cartão de Débito','Transferência','Boleto','Cheque'];
 const V_DEFERIDAS=['Boleto','Cheque']; // só entram no caixa quando dá baixa
 function abrirNovaVenda(preCli){
-  _vLinhas=[{forma:'PIX', val:'', venc:''}];
+  _vLinhas=[{forma:'PIX', val:'', venc:'', parcelas:1}];
   $('mod-title').innerHTML='💰 Registrar Venda';
   $('mod-body').innerHTML=`
     <div class="fg"><label>Cliente *</label><input class="fc" id="v-cli" list="v-cli-dl" placeholder="Nome do cliente" value="${(preCli||'').replace(/"/g,'&quot;')}"><datalist id="v-cli-dl">${DB.empresas.map(e=>`<option value="${e.nome}">`).join('')}</datalist></div>
@@ -3601,14 +3601,34 @@ function renderVendaPag(){
         <input class="fc" style="flex:1" type="number" step="0.01" min="0" value="${l.val}" placeholder="0,00" oninput="_vLinhas[${i}].val=this.value;vendaCalc()">
         ${_vLinhas.length>1?`<button onclick="_vLinhas.splice(${i},1);renderVendaPag();vendaCalc()" style="width:30px;height:30px;border-radius:7px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.1);color:#ef4444;cursor:pointer;flex-shrink:0;font-family:var(--F)">✕</button>`:''}
       </div>
-      ${V_DEFERIDAS.includes(l.forma)?`<div style="display:flex;align-items:center;gap:7px;margin-top:5px;background:rgba(255,140,66,.07);border:1px solid rgba(255,140,66,.2);border-radius:8px;padding:6px 9px">
-        <span style="font-size:11px;color:var(--orange);white-space:nowrap;font-weight:700">📅 Vence:</span>
-        <input class="fc" type="date" style="flex:1;font-size:12px;padding:5px" value="${l.venc||''}" oninput="_vLinhas[${i}].venc=this.value">
-        <span style="font-size:9px;color:var(--t3);white-space:nowrap">entra no caixa só na baixa</span>
+      ${V_DEFERIDAS.includes(l.forma)?`<div style="margin-top:5px;background:rgba(255,140,66,.07);border:1px solid rgba(255,140,66,.2);border-radius:8px;padding:8px 9px">
+        <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+          <span style="font-size:11px;color:var(--orange);white-space:nowrap;font-weight:700">📅 1º vence:</span>
+          <input class="fc" type="date" style="flex:1;min-width:120px;font-size:12px;padding:5px" value="${l.venc||''}" oninput="_vLinhas[${i}].venc=this.value;renderVendaPagInfo(${i})">
+          <span style="font-size:11px;color:var(--t2);white-space:nowrap;font-weight:700">em</span>
+          <input class="fc" type="number" min="1" max="36" style="width:60px;font-size:12px;padding:5px;text-align:center" value="${l.parcelas||1}" oninput="_vLinhas[${i}].parcelas=parseInt(this.value)||1;renderVendaPagInfo(${i})">
+          <span style="font-size:11px;color:var(--t2);white-space:nowrap;font-weight:700">${l.forma==='Cheque'?'cheque(s)':'boleto(s)'}</span>
+        </div>
+        <div id="v-parc-info-${i}" style="font-size:10.5px;color:var(--t3);margin-top:5px"></div>
       </div>`:''}
     </div>`).join('');
+  // preenche infos das parcelas
+  _vLinhas.forEach((l,i)=>{ if(V_DEFERIDAS.includes(l.forma)) renderVendaPagInfo(i); });
 }
-function vendaAddForma(){ _vLinhas.push({forma:'Dinheiro',val:'',venc:''}); renderVendaPag(); vendaCalc(); }
+// Mostra a previsão das parcelas do boleto/cheque
+function renderVendaPagInfo(i){
+  const el=$('v-parc-info-'+i); if(!el) return;
+  const l=_vLinhas[i]; if(!l) return;
+  const val=parseFloat(l.val)||0;
+  const n=parseInt(l.parcelas)||1;
+  if(val<=0 || !l.venc){ el.textContent='Preencha valor e 1º vencimento.'; return; }
+  const vp=val/n;
+  const d0=new Date(l.venc+'T00:00:00');
+  const ultimo=new Date(d0.getFullYear(), d0.getMonth()+(n-1), d0.getDate());
+  if(n<=1){ el.innerHTML=`1 ${l.forma.toLowerCase()} de <b>${fmtR(val)}</b> · entra no caixa só na baixa`; }
+  else{ el.innerHTML=`<b style="color:var(--orange)">${n}x de ${fmtR(vp)}</b> · 1º em ${d0.toLocaleDateString('pt-BR')}, último em ${ultimo.toLocaleDateString('pt-BR')} · cada um entra no caixa quando você der baixa`; }
+}
+function vendaAddForma(){ _vLinhas.push({forma:'Dinheiro',val:'',venc:'',parcelas:1}); renderVendaPag(); vendaCalc(); }
 function vendaCalc(){
   const eq=parseFloat($('v-eq')?.value||'0')||0;
   const mo=parseFloat($('v-mo')?.value||'0')||0;
@@ -3658,10 +3678,25 @@ function confirmarVenda(){
     const v=parseFloat(l.val)||0;
     const vencFmt=l.venc?new Date(l.venc+'T00:00:00').toLocaleDateString('pt-BR'):'';
     if(V_DEFERIDAS.includes(l.forma)){
-      // vira cobrança pendente — só entra no caixa quando der baixa
-      DB.cobrancas.push({id:uid(), cliente:cli, descricao:`${l.forma} — ${prod||'Venda'}`, valor:v, vencimento:l.venc, forma:l.forma, pago:false, origem:'venda', vendaId, criadoEm:nowStr()});
+      // vira cobrança(s) pendente(s) — só entra no caixa quando der baixa
+      const n=Math.max(1, parseInt(l.parcelas)||1);
+      const vp=Math.round(v/n); // valor de cada parcela (reais inteiros)
+      const d0=new Date(l.venc+'T00:00:00');
+      for(let p=0; p<n; p++){
+        const dv=new Date(d0.getFullYear(), d0.getMonth()+p, d0.getDate());
+        const vencISO=`${dv.getFullYear()}-${String(dv.getMonth()+1).padStart(2,'0')}-${String(dv.getDate()).padStart(2,'0')}`;
+        // ajuste do último para fechar o total exato
+        const valParcela = (p===n-1) ? (v - vp*(n-1)) : vp;
+        DB.cobrancas.push({
+          id:uid(), cliente:cli,
+          descricao:`${l.forma} — ${prod||'Venda'}${n>1?` (${p+1}/${n})`:''}`,
+          valor:valParcela, vencimento:vencISO, forma:l.forma,
+          parcela:n>1?`${p+1}/${n}`:'', pago:false, origem:'venda', vendaId, criadoEm:nowStr()
+        });
+      }
       aReceber+=v;
-      pagResumo.push(`${l.forma}: ${fmtR(v)}${vencFmt?' (vence '+vencFmt+')':''} - a receber`);
+      const vencFmt=new Date(l.venc+'T00:00:00').toLocaleDateString('pt-BR');
+      pagResumo.push(n>1?`${l.forma} ${n}x de ${fmtR(vp)} (1º vence ${vencFmt}) - a receber`:`${l.forma}: ${fmtR(v)} (vence ${vencFmt}) - a receber`);
     }else{
       // entra no caixa agora
       DB.movs.unshift({id:uid(), tipo:'in', val:String(Math.round(v)), desc:`💰 Venda (${l.forma}) — ${cli}`, ref:`${prod||'Venda'} · ${hojeStr}`, data:new Date().toISOString(), vendaId});
@@ -3670,7 +3705,7 @@ function confirmarVenda(){
     }
   });
   DB.vendas=DB.vendas||[];
-  DB.vendas.unshift({id:vendaId, cli, produtos:prod, valEquip:eq, valMO:mo, custo, total, lucro, data:hojeStr, pagamentos:linhas.map(l=>({forma:l.forma,val:parseFloat(l.val)||0,venc:l.venc||''})), ts:Date.now()});
+  DB.vendas.unshift({id:vendaId, cli, produtos:prod, valEquip:eq, valMO:mo, custo, total, lucro, data:hojeStr, pagamentos:linhas.map(l=>({forma:l.forma,val:parseFloat(l.val)||0,venc:l.venc||'',parcelas:parseInt(l.parcelas)||1})), ts:Date.now()});
   // espelha no histórico do cliente (pra ficha)
   if(!DB.comprasClientes) DB.comprasClientes={};
   if(!DB.comprasClientes[cli]) DB.comprasClientes[cli]=[];
