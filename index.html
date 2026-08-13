@@ -285,10 +285,10 @@ tr:hover td{background:rgba(255,255,255,.017);}
 .nav-group .ni:hover{border-left-color:rgba(245,166,35,.5);}
 .nav-group .ni.on{border-left-color:var(--gold);}
 /* adm: oculta por padrão exceto nav-group (controlado por open/close) */
-.adm:not(.nav-group){display:none;}
+body.naoadmin .adm:not(.nav-group){display:none;}
 </style>
 </head>
-<body>
+<body class="naoadmin">
 
 <!-- LOGIN -->
 <div id="LS">
@@ -312,7 +312,7 @@ tr:hover td{background:rgba(255,255,255,.017);}
 <div class="sb" id="SIDEBAR">
   <!-- Botão fechar no mobile -->
   <button onclick="toggleSidebar()" style="display:none;position:absolute;top:10px;right:10px;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:18px;width:32px;height:32px;border-radius:8px;cursor:pointer;align-items:center;justify-content:center;z-index:10" id="mob-close-btn">✕</button>
-  <div class="slogo"><div class="smark">⚡</div><div><div class="sname">Aliance <span style="font-size:9px;color:#00d97e;font-weight:700;background:rgba(0,217,126,.12);padding:1px 6px;border-radius:6px;vertical-align:middle">v53 verfila</span></div><div class="ssub">Gerencie clientes. Feche mais negócios.</div></div></div>
+  <div class="slogo"><div class="smark">⚡</div><div><div class="sname">Aliance <span style="font-size:9px;color:#00d97e;font-weight:700;background:rgba(0,217,126,.12);padding:1px 6px;border-radius:6px;vertical-align:middle">v54 botoes-adm</span></div><div class="ssub">Gerencie clientes. Feche mais negócios.</div></div></div>
   <nav id="NAV">
 
     <!-- ── PRINCIPAL (colapsável) ── -->
@@ -1519,6 +1519,7 @@ async function getBDFromSupabase(){
 function applyProfile(){
   if(!CU)return;
   const adm=isAdmin();
+  document.body.classList.toggle('naoadmin', !adm);
   $('sav').textContent=CU.ini;$('sav').style.background=CU.cor;
   $('snm').textContent=CU.nome;
   $('srl').textContent=adm?'Sócio Administrador':'Colaborador';
@@ -3355,7 +3356,7 @@ function rFinanceiro(){
       </div>
       <div style="display:flex;align-items:center;gap:7px">
         <span style="font-size:13px;font-weight:800;font-family:var(--M);color:${corValor}">${sinal} ${fmtR(mv.val)}</span>
-        <button class="btn br sm adm" onclick="delMov(${mv.id})" style="padding:2px 5px;font-size:9px">✕</button>
+        <button class="btn br sm adm" onclick="delMov(${mv.id})" style="padding:4px 9px;font-size:12px" title="Apagar lançamento">🗑️</button>
       </div>
     </div>`;
   }).join('')+`
