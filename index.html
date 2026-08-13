@@ -396,7 +396,7 @@ body.naoadmin .adm:not(.nav-group){display:none;}
 <div class="sb" id="SIDEBAR">
   <!-- Botão fechar no mobile -->
   <button onclick="toggleSidebar()" style="display:none;position:absolute;top:10px;right:10px;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:18px;width:32px;height:32px;border-radius:8px;cursor:pointer;align-items:center;justify-content:center;z-index:10" id="mob-close-btn">✕</button>
-  <div class="slogo"><div class="smark">⚡</div><div><div class="sname">Aliance <span style="font-size:9px;color:#00d97e;font-weight:700;background:rgba(0,217,126,.12);padding:1px 6px;border-radius:6px;vertical-align:middle">v56 app</span></div><div class="ssub">Gerencie clientes. Feche mais negócios.</div></div></div>
+  <div class="slogo"><div class="smark">⚡</div><div><div class="sname">Aliance <span style="font-size:9px;color:#00d97e;font-weight:700;background:rgba(0,217,126,.12);padding:1px 6px;border-radius:6px;vertical-align:middle">v58 equip-mo</span></div><div class="ssub">Gerencie clientes. Feche mais negócios.</div></div></div>
   <button id="btn-instalar-app" onclick="instalarApp()" style="display:flex;align-items:center;justify-content:center;gap:7px;width:calc(100% - 24px);margin:0 12px 8px;padding:9px;background:linear-gradient(135deg,var(--red),#b3161d);border:none;border-radius:10px;color:#fff;font-size:12px;font-weight:800;cursor:pointer;font-family:var(--F)">📲 Instalar como App</button>
   <nav id="NAV">
 
@@ -7503,13 +7503,39 @@ async function enviarPropostaEmail(idx){
 if(!DB.historico) DB.historico={};// {nomeCliente: [{id,tipo,desc,icone,data,ts}]}
 
 // ── Compras Anteriores do Cliente (sem afetar financeiro) ──
+function cpCalcTotal(){
+  const eq=parseFloat($('cp-valEquip')?.value||'0')||0;
+  const mo=parseFloat($('cp-valMO')?.value||'0')||0;
+  const total=eq+mo;
+  const out=$('cp-valor'); if(out) out.value = total>0 ? String(total) : '';
+  cpCalcParcela();
+}
+function cpPagChange(){
+  const t=$('cp-pagtipo')?.value;
+  const av=$('cp-pag-avista'), pa=$('cp-pag-parcelado'), di=$('cp-pag-dividido');
+  if(av) av.style.display = t==='avista'?'block':'none';
+  if(pa) pa.style.display = t==='parcelado'?'block':'none';
+  if(di) di.style.display = t==='dividido'?'block':'none';
+}
+function cpCalcParcela(){
+  const valTotal=parseR($('cp-valor')?.value||'0');
+  const entrada=parseFloat($('cp-entrada')?.value||'0')||0;
+  const n=parseInt($('cp-parcelas')?.value||'0')||0;
+  const out=$('cp-valorparc'); if(!out) return;
+  if(n>0){
+    const restante=Math.max(0, valTotal-entrada);
+    out.value = restante>0 ? fmtR(restante/n) : fmtR(0);
+  }else{
+    out.value='';
+  }
+}
 function adicionarCompraCliente(){
   if(!_histCliente){toast('⚠️ Selecione um cliente primeiro!');return;}
 
   $('mod-title').innerHTML='🛍️ Registrar Compra Anterior';
   $('mod-body').innerHTML=`
     <div style="background:rgba(61,155,255,.07);border:1px solid rgba(61,155,255,.2);border-radius:9px;padding:10px;margin-bottom:12px;font-size:12px;color:var(--t2)">
-      ℹ️ Este registro é apenas para <strong>contexto e histórico</strong>. Não entra no financeiro nem no dashboard de vendas. Serve para a IA entender melhor o cliente.
+      ℹ️ Registre o que o cliente comprou, <strong>quanto pagou e como dividiu</strong>. Fica no histórico do cliente para controle — não mexe no saldo do financeiro.
     </div>
     <div class="fg"><label>Produto / Serviço *</label>
       <input class="fc" id="cp-produto" placeholder="Ex: Câmeras residencial, Alarme comercial, Cerca elétrica..." list="cp-produtos-list">
@@ -7526,8 +7552,16 @@ function adicionarCompraCliente(){
       </div>
     </div>
     <div class="fg2">
-      <div class="fg"><label>Valor de Referência <span style="color:var(--t3)">(opcional, não contabiliza)</span></label>
-        <input class="fc" id="cp-valor" placeholder="Ex: R$ 2.500">
+      <div class="fg"><label>💰 Valor do Equipamento (R$)</label>
+        <input class="fc" id="cp-valEquip" type="number" min="0" step="0.01" placeholder="Ex: 1800" oninput="cpCalcTotal()">
+      </div>
+      <div class="fg"><label>🔧 Mão de obra / Instalação (R$)</label>
+        <input class="fc" id="cp-valMO" type="number" min="0" step="0.01" placeholder="Ex: 700" oninput="cpCalcTotal()">
+      </div>
+    </div>
+    <div class="fg2">
+      <div class="fg"><label>Valor total (R$)</label>
+        <input class="fc" id="cp-valor" placeholder="soma automática" readonly style="background:var(--s2);font-weight:800">
       </div>
       <div class="fg"><label>Categoria</label>
         <select class="fc" id="cp-icone">
@@ -7542,6 +7576,31 @@ function adicionarCompraCliente(){
         </select>
       </div>
     </div>
+    <div class="fg"><label>Como o cliente pagou?</label>
+      <select class="fc" id="cp-pagtipo" onchange="cpPagChange()">
+        <option value="avista">💵 À vista</option>
+        <option value="parcelado">💳 Parcelado</option>
+        <option value="dividido">🔀 Dividido em formas</option>
+      </select>
+    </div>
+    <div id="cp-pag-avista">
+      <div class="fg"><label>Forma de pagamento</label>
+        <select class="fc" id="cp-forma"><option>PIX</option><option>Dinheiro</option><option>Cartão de Crédito</option><option>Cartão de Débito</option><option>Transferência</option><option>Boleto</option></select>
+      </div>
+    </div>
+    <div id="cp-pag-parcelado" style="display:none">
+      <div class="fg2">
+        <div class="fg"><label>Entrada (R$)</label><input class="fc" id="cp-entrada" type="number" min="0" placeholder="0" oninput="cpCalcParcela()"></div>
+        <div class="fg"><label>Nº de parcelas</label><input class="fc" id="cp-parcelas" type="number" min="1" placeholder="3" oninput="cpCalcParcela()"></div>
+      </div>
+      <div class="fg"><label>Valor de cada parcela</label><input class="fc" id="cp-valorparc" placeholder="calculado automaticamente" readonly style="background:var(--s2)"></div>
+      <div class="fg"><label>Forma das parcelas</label><select class="fc" id="cp-formaparc"><option>Cartão de Crédito</option><option>Boleto</option><option>Carnê</option><option>PIX mensal</option><option>Cheque</option></select></div>
+    </div>
+    <div id="cp-pag-dividido" style="display:none">
+      <div class="fg"><label>Descreva a divisão do pagamento</label>
+        <textarea class="fc" id="cp-divtxt" rows="2" placeholder="Ex: R$ 1.000 no PIX + R$ 1.000 no cartão em 3x + R$ 500 em dinheiro"></textarea>
+      </div>
+    </div>
     <div class="fg"><label>Observações / Detalhes</label>
       <textarea class="fc" id="cp-desc" rows="2" placeholder="Ex: Instalado na entrada e garagem, com DVR 8 canais..."></textarea>
     </div>`;
@@ -7553,13 +7612,32 @@ function adicionarCompraCliente(){
     if(!produto){toast('⚠️ Informe o produto!');return;}
     if(!DB.comprasClientes) DB.comprasClientes={};
     if(!DB.comprasClientes[_histCliente]) DB.comprasClientes[_histCliente]=[];
+    // monta a forma de pagamento
+    const pagtipo=$('cp-pagtipo')?.value||'avista';
+    let pagamento={tipo:pagtipo};
+    if(pagtipo==='avista'){
+      pagamento.forma=$('cp-forma')?.value||'PIX';
+      pagamento.resumo=`À vista · ${pagamento.forma}`;
+    }else if(pagtipo==='parcelado'){
+      pagamento.entrada=parseFloat($('cp-entrada')?.value||'0')||0;
+      pagamento.parcelas=parseInt($('cp-parcelas')?.value||'0')||0;
+      pagamento.valorParcela=$('cp-valorparc')?.value||'';
+      pagamento.formaParc=$('cp-formaparc')?.value||'';
+      pagamento.resumo=`Parcelado${pagamento.entrada?' · entrada '+fmtR(pagamento.entrada):''} · ${pagamento.parcelas}x de ${pagamento.valorParcela||'—'}${pagamento.formaParc?' ('+pagamento.formaParc+')':''}`;
+    }else{
+      pagamento.descricao=($('cp-divtxt')?.value||'').trim();
+      pagamento.resumo=`Dividido · ${pagamento.descricao||'—'}`;
+    }
     DB.comprasClientes[_histCliente].push({
       produto,
       data:$('cp-data')?.value?new Date($('cp-data').value).toLocaleDateString('pt-BR'):'',
       qtd:parseInt($('cp-qtd')?.value)||1,
+      valEquip:parseFloat($('cp-valEquip')?.value||'0')||0,
+      valMO:parseFloat($('cp-valMO')?.value||'0')||0,
       valor:($('cp-valor')?.value||'').trim(),
       icone:$('cp-icone')?.value||'🛍️',
       desc:($('cp-desc')?.value||'').trim(),
+      pagamento,
       ts:Date.now()
     });
     // Registra no histórico também (como evento)
@@ -7645,7 +7723,18 @@ function rHistorico(cliente){
 
   // Adiciona compras anteriores como eventos (sem valor financeiro)
   ((DB.comprasClientes||{})[_histCliente]||[]).forEach(c=>{
-    eventos.push({tipo:'compra',desc:`Compra registrada: ${c.produto}${c.desc?' — '+c.desc:''}${c.qtd?' (x'+c.qtd+')':''}`,icone:'🛍️',data:c.data||'—',ts:c.ts||0});
+    const eq=parseFloat(c.valEquip||0)||0, mo=parseFloat(c.valMO||0)||0;
+    let breakdown='';
+    if(eq>0||mo>0){
+      const parts=[];
+      if(eq>0) parts.push(`Equipamento ${fmtR(eq)}`);
+      if(mo>0) parts.push(`Mão de obra ${fmtR(mo)}`);
+      breakdown=` — ${parts.join(' + ')} = ${fmtR(eq+mo)}`;
+    } else if(c.valor){
+      breakdown=` — ${/^R\$/.test(c.valor)?c.valor:'R$ '+c.valor}`;
+    }
+    const pag=c.pagamento?.resumo?` · 💳 ${c.pagamento.resumo}`:'';
+    eventos.push({tipo:'compra',desc:`Compra: ${c.produto}${c.qtd>1?' (x'+c.qtd+')':''}${breakdown}${pag}${c.desc?' — '+c.desc:''}`,icone:c.icone||'🛍️',data:c.data||'—',ts:c.ts||0});
   });
 
   // Agrega eventos automáticos de outras tabelas
