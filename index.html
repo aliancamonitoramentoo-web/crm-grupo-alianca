@@ -396,7 +396,7 @@ body.naoadmin .adm:not(.nav-group){display:none;}
 <div class="sb" id="SIDEBAR">
   <!-- Botão fechar no mobile -->
   <button onclick="toggleSidebar()" style="display:none;position:absolute;top:10px;right:10px;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:18px;width:32px;height:32px;border-radius:8px;cursor:pointer;align-items:center;justify-content:center;z-index:10" id="mob-close-btn">✕</button>
-  <div class="slogo"><div class="smark">⚡</div><div><div class="sname">Aliance <span style="font-size:9px;color:#00d97e;font-weight:700;background:rgba(0,217,126,.12);padding:1px 6px;border-radius:6px;vertical-align:middle">v58 equip-mo</span></div><div class="ssub">Gerencie clientes. Feche mais negócios.</div></div></div>
+  <div class="slogo"><div class="smark">⚡</div><div><div class="sname">Aliance <span style="font-size:9px;color:#00d97e;font-weight:700;background:rgba(0,217,126,.12);padding:1px 6px;border-radius:6px;vertical-align:middle">v59 lucro</span></div><div class="ssub">Gerencie clientes. Feche mais negócios.</div></div></div>
   <button id="btn-instalar-app" onclick="instalarApp()" style="display:flex;align-items:center;justify-content:center;gap:7px;width:calc(100% - 24px);margin:0 12px 8px;padding:9px;background:linear-gradient(135deg,var(--red),#b3161d);border:none;border-radius:10px;color:#fff;font-size:12px;font-weight:800;cursor:pointer;font-family:var(--F)">📲 Instalar como App</button>
   <nav id="NAV">
 
@@ -7506,8 +7506,24 @@ if(!DB.historico) DB.historico={};// {nomeCliente: [{id,tipo,desc,icone,data,ts}
 function cpCalcTotal(){
   const eq=parseFloat($('cp-valEquip')?.value||'0')||0;
   const mo=parseFloat($('cp-valMO')?.value||'0')||0;
+  const custo=parseFloat($('cp-custo')?.value||'0')||0;
   const total=eq+mo;
   const out=$('cp-valor'); if(out) out.value = total>0 ? String(total) : '';
+  // Lucro ao vivo
+  const box=$('cp-lucro-box');
+  if(box){
+    const lucroEq=eq-custo;
+    const lucroTot=lucroEq+mo;
+    if(eq>0||mo>0){
+      box.style.display='block';
+      const setv=(id,v)=>{const el=$(id);if(el){el.textContent=fmtR(v);el.style.color=v<0?'var(--red)':(id==='cp-luc-tot'?'var(--green)':'var(--t1)');}};
+      setv('cp-luc-eq', lucroEq);
+      setv('cp-luc-mo', mo);
+      setv('cp-luc-tot', lucroTot);
+    }else{
+      box.style.display='none';
+    }
+  }
   cpCalcParcela();
 }
 function cpPagChange(){
@@ -7552,15 +7568,24 @@ function adicionarCompraCliente(){
       </div>
     </div>
     <div class="fg2">
-      <div class="fg"><label>💰 Valor do Equipamento (R$)</label>
-        <input class="fc" id="cp-valEquip" type="number" min="0" step="0.01" placeholder="Ex: 1800" oninput="cpCalcTotal()">
+      <div class="fg"><label>💰 Valor do Equipamento <span style="color:var(--t3)">(preço de venda)</span></label>
+        <input class="fc" id="cp-valEquip" type="number" min="0" step="0.01" placeholder="Ex: 5000" oninput="cpCalcTotal()">
       </div>
       <div class="fg"><label>🔧 Mão de obra / Instalação (R$)</label>
-        <input class="fc" id="cp-valMO" type="number" min="0" step="0.01" placeholder="Ex: 700" oninput="cpCalcTotal()">
+        <input class="fc" id="cp-valMO" type="number" min="0" step="0.01" placeholder="Ex: 1000" oninput="cpCalcTotal()">
       </div>
     </div>
+    <div class="fg"><label>🏷️ Custo dos equipamentos <span style="color:var(--t3)">(quanto você pagou pra comprar o lote — opcional)</span></label>
+      <input class="fc" id="cp-custo" type="number" min="0" step="0.01" placeholder="Ex: 3200" oninput="cpCalcTotal()">
+    </div>
+    <div id="cp-lucro-box" style="display:none;background:linear-gradient(135deg,rgba(0,217,126,.08),rgba(0,217,126,.03));border:1px solid rgba(0,217,126,.25);border-radius:10px;padding:11px 13px;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:800;color:var(--green);margin-bottom:7px">💚 SEU LUCRO NESTA VENDA</div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span style="color:var(--t2)">Lucro no equipamento</span><span id="cp-luc-eq" style="color:var(--t1);font-weight:700">R$ 0</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span style="color:var(--t2)">Lucro na mão de obra</span><span id="cp-luc-mo" style="color:var(--t1);font-weight:700">R$ 0</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:14px;margin-top:6px;padding-top:6px;border-top:1px solid rgba(0,217,126,.2)"><span style="color:var(--green);font-weight:800">LUCRO TOTAL</span><span id="cp-luc-tot" style="color:var(--green);font-weight:900;font-family:var(--M)">R$ 0</span></div>
+    </div>
     <div class="fg2">
-      <div class="fg"><label>Valor total (R$)</label>
+      <div class="fg"><label>Valor total cobrado (R$)</label>
         <input class="fc" id="cp-valor" placeholder="soma automática" readonly style="background:var(--s2);font-weight:800">
       </div>
       <div class="fg"><label>Categoria</label>
@@ -7634,6 +7659,7 @@ function adicionarCompraCliente(){
       qtd:parseInt($('cp-qtd')?.value)||1,
       valEquip:parseFloat($('cp-valEquip')?.value||'0')||0,
       valMO:parseFloat($('cp-valMO')?.value||'0')||0,
+      custo:parseFloat($('cp-custo')?.value||'0')||0,
       valor:($('cp-valor')?.value||'').trim(),
       icone:$('cp-icone')?.value||'🛍️',
       desc:($('cp-desc')?.value||'').trim(),
@@ -7723,13 +7749,17 @@ function rHistorico(cliente){
 
   // Adiciona compras anteriores como eventos (sem valor financeiro)
   ((DB.comprasClientes||{})[_histCliente]||[]).forEach(c=>{
-    const eq=parseFloat(c.valEquip||0)||0, mo=parseFloat(c.valMO||0)||0;
+    const eq=parseFloat(c.valEquip||0)||0, mo=parseFloat(c.valMO||0)||0, custo=parseFloat(c.custo||0)||0;
     let breakdown='';
     if(eq>0||mo>0){
       const parts=[];
       if(eq>0) parts.push(`Equipamento ${fmtR(eq)}`);
       if(mo>0) parts.push(`Mão de obra ${fmtR(mo)}`);
       breakdown=` — ${parts.join(' + ')} = ${fmtR(eq+mo)}`;
+      if(custo>0){
+        const lucro=(eq-custo)+mo;
+        breakdown+=` · 💚 Lucro ${fmtR(lucro)} (equip ${fmtR(eq-custo)} + M.O. ${fmtR(mo)})`;
+      }
     } else if(c.valor){
       breakdown=` — ${/^R\$/.test(c.valor)?c.valor:'R$ '+c.valor}`;
     }
