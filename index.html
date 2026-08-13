@@ -396,7 +396,7 @@ body.naoadmin .adm:not(.nav-group){display:none;}
 <div class="sb" id="SIDEBAR">
   <!-- Botão fechar no mobile -->
   <button onclick="toggleSidebar()" style="display:none;position:absolute;top:10px;right:10px;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:18px;width:32px;height:32px;border-radius:8px;cursor:pointer;align-items:center;justify-content:center;z-index:10" id="mob-close-btn">✕</button>
-  <div class="slogo"><div class="smark">⚡</div><div><div class="sname">Aliance <span style="font-size:9px;color:#00d97e;font-weight:700;background:rgba(0,217,126,.12);padding:1px 6px;border-radius:6px;vertical-align:middle">v59 lucro</span></div><div class="ssub">Gerencie clientes. Feche mais negócios.</div></div></div>
+  <div class="slogo"><div class="smark">⚡</div><div><div class="sname">Aliance <span style="font-size:9px;color:#00d97e;font-weight:700;background:rgba(0,217,126,.12);padding:1px 6px;border-radius:6px;vertical-align:middle">v60 vendas</span></div><div class="ssub">Gerencie clientes. Feche mais negócios.</div></div></div>
   <button id="btn-instalar-app" onclick="instalarApp()" style="display:flex;align-items:center;justify-content:center;gap:7px;width:calc(100% - 24px);margin:0 12px 8px;padding:9px;background:linear-gradient(135deg,var(--red),#b3161d);border:none;border-radius:10px;color:#fff;font-size:12px;font-weight:800;cursor:pointer;font-family:var(--F)">📲 Instalar como App</button>
   <nav id="NAV">
 
@@ -491,11 +491,18 @@ body.naoadmin .adm:not(.nav-group){display:none;}
 <div class="pg on" id="pg-dashboard">
   <div id="dash-reconquista" style="display:none"></div>
   <div id="dash-recorrentes" style="display:none"></div>
+  <div id="dash-boletos" style="display:none"></div>
   <div class="g4">
     <div class="kpi kg"><div class="kic">💰</div><div class="kl">Receita Mensal Total</div><div class="kv" id="k-rec">R$ 0</div><div class="kd" id="k-recd">— sem contratos</div></div>
     <div class="kpi kgr"><div class="kic">📄</div><div class="kl">Contratos Ativos</div><div class="kv" id="k-con">0</div><div class="kd" id="k-cond">—</div></div>
     <div class="kpi kp"><div class="kic">🏆</div><div class="kl">Receita de Vendas</div><div class="kv" id="k-vendas">R$ 0</div><div class="kd" id="k-vendas-d">vendas fechadas</div></div>
     <div class="kpi kb"><div class="kic">🔥</div><div class="kl">Leads no Funil</div><div class="kv" id="k-lea">0</div><div class="kd" id="k-lead">—</div></div>
+  </div>
+  <div class="g4" style="margin-top:12px">
+    <div class="kpi kg" style="border:1px solid rgba(0,217,126,.25)"><div class="kic">💚</div><div class="kl">Lucro em Vendas</div><div class="kv" id="k-lucro" style="color:var(--green)">R$ 0</div><div class="kd" id="k-lucrod">equipamento + mão de obra</div></div>
+    <div style="grid-column:span 3;display:flex;align-items:center;justify-content:flex-end">
+      <button class="btn" style="background:linear-gradient(135deg,var(--green),#00b368);color:#000;font-weight:800;padding:11px 20px;border-radius:11px" onclick="abrirNovaVenda()">💰 Registrar Venda</button>
+    </div>
   </div>
 
   <!-- Receita por Tipo de Contrato — LOGO ABAIXO DOS KPIs -->
@@ -671,7 +678,7 @@ body.naoadmin .adm:not(.nav-group){display:none;}
   </div>
   <div class="g2">
     <div class="card"><div class="ch"><span class="ct">Distribuição por Contrato</span><span class="pill pg2">Real</span></div><div class="cb"><div style="height:168px"><canvas id="ch-fin"></canvas></div></div></div>
-    <div class="card"><div class="ch"><span class="ct">Lançamentos Financeiros</span><button class="btn bg sm" onclick="M.open('mov')">+ Lançar</button></div><div class="cb" id="fin-movs"></div></div>
+    <div class="card"><div class="ch"><span class="ct">Lançamentos Financeiros</span><div style="display:flex;gap:6px"><button class="btn sm" style="background:rgba(0,217,126,.14);color:var(--green);font-weight:800" onclick="abrirNovaVenda()">💰 Nova Venda</button><button class="btn bg sm" onclick="M.open('mov')">+ Lançar</button></div></div><div class="cb" id="fin-movs"></div></div>
   </div>
   <div class="card" style="margin-top:4px"><div class="ch"><span class="ct">💸 Despesas por Categoria</span><span class="pill pr">Saídas</span></div><div class="cb" id="fin-cat"></div></div>
 </div>
@@ -1242,6 +1249,7 @@ const DB={
   tasks:[],     // {id,txt,due,pri,done,per}
   contratos:[], // {id,cid,cli,srv,val,ini,venc,s}
   recorrentes:[], // {id,cli,servico,val,diaVenc,ativo,pagamentos:[{mes,val,pagoEm,forma}],proximoVenc,criadoEm}
+  vendas:[], // {id,cli,produtos,valEquip,valMO,custo,total,lucro,data,pagamentos:[{forma,val,venc}],ts}
   os:[],        // {id,oid,cli,tipo,tec,data,s}
   agenda:{h:[],s:[]},
   cameras:[],
@@ -1448,7 +1456,7 @@ const st=s=>{
   return `<span class="st" style="background:${cor}18;color:${cor}">${label}</span>`;
 };
 const fmtR=v=>'R$ '+(parseInt(v)||0).toLocaleString('pt-BR');
-const parseR=s=>parseInt((s||'0').replace(/\D/g,''))||0;
+const parseR=s=>parseInt(String(s==null?'0':s).replace(/\D/g,''))||0;
 const nowStr=()=>new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
 const dateStr=()=>new Date().toLocaleDateString('pt-BR');
 const empty=(ic,t,s)=>`<div class="empty"><div class="ei">${ic}</div><div class="et">${t}</div><div class="es">${s}</div></div>`;
@@ -1873,6 +1881,34 @@ function updKPI(){
   updReconquistaAlert();
   if(typeof updRecKPIs==='function') updRecKPIs();
   updRecDashAlert();
+  // Lucro em vendas
+  if(typeof calcLucroVendas==='function') set('k-lucro', fmtR(calcLucroVendas()));
+  const nv=(DB.vendas||[]).length;
+  set('k-lucrod', nv?`de ${nv} venda${nv>1?'s':''}`:'equipamento + mão de obra');
+  updBoletoAlert();
+}
+
+// Alerta de boletos/cobranças a vencer ou vencidos (no Dashboard)
+function updBoletoAlert(){
+  const el=$('dash-boletos'); if(!el) return;
+  if(!DB.cobrancas || !DB.cobrancas.length){ el.style.display='none'; el.innerHTML=''; return; }
+  const hoje=new Date(); hoje.setHours(0,0,0,0);
+  const em3=new Date(hoje); em3.setDate(em3.getDate()+3);
+  const pend=DB.cobrancas.filter(c=>!c.pago && c.vencimento);
+  const vencidos=pend.filter(c=>{const v=new Date(c.vencimento);v.setHours(0,0,0,0);return v<hoje;});
+  const proximos=pend.filter(c=>{const v=new Date(c.vencimento);v.setHours(0,0,0,0);return v>=hoje&&v<=em3;});
+  if(!vencidos.length && !proximos.length){ el.style.display='none'; el.innerHTML=''; return; }
+  const totalV=vencidos.reduce((a,c)=>a+parseR(c.valor),0);
+  const totalP=proximos.reduce((a,c)=>a+parseR(c.valor),0);
+  el.style.display='block';
+  el.innerHTML=`<div style="background:linear-gradient(135deg,rgba(255,69,96,.13),rgba(245,166,35,.09));border:1px solid rgba(245,166,35,.35);border-radius:14px;padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+    <div style="font-size:26px">🧾</div>
+    <div style="flex:1;min-width:180px">
+      <div style="font-weight:800;font-size:14px;color:var(--t1)">Boletos e cobranças a receber</div>
+      <div style="font-size:12px;color:var(--t2);margin-top:2px">${vencidos.length?`<b style="color:var(--red)">${vencidos.length} vencido${vencidos.length>1?'s':''} (${fmtR(totalV)})</b>`:''}${vencidos.length&&proximos.length?' · ':''}${proximos.length?`${proximos.length} vence${proximos.length>1?'m':''} em até 3 dias (${fmtR(totalP)})`:''}</div>
+    </div>
+    <button onclick="go('cobrancas')" style="padding:9px 16px;background:var(--gold);border:none;border-radius:9px;color:#000;font-weight:800;font-size:12px;cursor:pointer;font-family:var(--F)">Ver</button>
+  </div>`;
 }
 
 // Alerta de mensalidades atrasadas no Dashboard
@@ -3515,6 +3551,144 @@ function rFinanceiro(){
   `:empty('💰','Sem lancamentos','Adicione entradas e saidas');
 }
 function delMov(id){registrarDelecao(id);DB.movs=DB.movs.filter(x=>x.id!==id);rFinanceiro();updKPI();toast('Lançamento removido!');}
+
+// ═══════════════════════════════════════════════════
+//  💰 REGISTRAR VENDA (equipamento + M.O. + lucro + pagamento)
+// ═══════════════════════════════════════════════════
+let _vLinhas=[];
+const V_FORMAS=['PIX','Dinheiro','Cartão de Crédito','Cartão de Débito','Transferência','Boleto','Cheque'];
+const V_DEFERIDAS=['Boleto','Cheque']; // só entram no caixa quando dá baixa
+function abrirNovaVenda(preCli){
+  _vLinhas=[{forma:'PIX', val:'', venc:''}];
+  $('mod-title').innerHTML='💰 Registrar Venda';
+  $('mod-body').innerHTML=`
+    <div class="fg"><label>Cliente *</label><input class="fc" id="v-cli" list="v-cli-dl" placeholder="Nome do cliente" value="${(preCli||'').replace(/"/g,'&quot;')}"><datalist id="v-cli-dl">${DB.empresas.map(e=>`<option value="${e.nome}">`).join('')}</datalist></div>
+    <div class="fg"><label>Produtos / Equipamentos *</label><textarea class="fc" id="v-prod" rows="2" placeholder="Ex: 12 Câmeras + DVR + HD + Fonte + Cerca Elétrica"></textarea></div>
+    <div class="fg2">
+      <div class="fg"><label>💰 Equipamento (venda)</label><input class="fc" id="v-eq" type="number" min="0" step="0.01" placeholder="5000" oninput="vendaCalc()"></div>
+      <div class="fg"><label>🔧 Mão de obra</label><input class="fc" id="v-mo" type="number" min="0" step="0.01" placeholder="1000" oninput="vendaCalc()"></div>
+    </div>
+    <div class="fg"><label>🏷️ Custo dos equipamentos <span style="color:var(--t3)">(quanto paguei — opcional, p/ calcular lucro)</span></label><input class="fc" id="v-custo" type="number" min="0" step="0.01" placeholder="3200" oninput="vendaCalc()"></div>
+    <div id="v-lucro-box" style="display:none;background:linear-gradient(135deg,rgba(0,217,126,.08),rgba(0,217,126,.03));border:1px solid rgba(0,217,126,.25);border-radius:10px;padding:10px 12px;margin-bottom:11px">
+      <div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:2px"><span style="color:var(--t2)">Lucro equipamento</span><span id="v-luc-eq" style="color:var(--t1);font-weight:700">R$ 0</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:2px"><span style="color:var(--t2)">Lucro mão de obra</span><span id="v-luc-mo" style="color:var(--t1);font-weight:700">R$ 0</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-top:5px;padding-top:5px;border-top:1px solid rgba(0,217,126,.2)"><span style="color:var(--green);font-weight:800">LUCRO TOTAL</span><span id="v-luc-tot" style="color:var(--green);font-weight:900;font-family:var(--M)">R$ 0</span></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 11px;background:var(--s2);border-radius:9px;margin-bottom:11px">
+      <span style="font-size:12px;color:var(--t3)">Total da venda</span>
+      <span id="v-total" style="font-size:17px;font-weight:900;font-family:var(--M)">R$ 0</span>
+    </div>
+    <label style="font-size:11px;color:var(--t3);font-weight:700">Como o cliente vai pagar?</label>
+    <div id="venda-pag" style="margin:8px 0"></div>
+    <button onclick="vendaAddForma()" style="width:100%;padding:8px;background:var(--s3);border:1px dashed var(--bd);border-radius:8px;color:var(--t2);font-size:12px;cursor:pointer;font-family:var(--F);margin-bottom:9px">+ Adicionar forma de pagamento</button>
+    <div style="display:flex;justify-content:space-between;padding:8px 11px;background:var(--s2);border-radius:9px;margin-bottom:12px;font-size:12px">
+      <span style="color:var(--t3)">Somado</span>
+      <span><span id="v-somado" style="font-weight:800;font-family:var(--M)">R$ 0</span> <span id="v-somado-st" style="font-size:10.5px;font-weight:700"></span></span>
+    </div>
+    <button onclick="confirmarVenda()" style="width:100%;padding:12px;background:var(--green);border:none;border-radius:10px;color:#000;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--F)">Registrar Venda</button>`;
+  const b=$('mod-save-btn'); if(b)b.style.display='none';
+  $('MOD').classList.add('open');
+  renderVendaPag(); vendaCalc();
+}
+function renderVendaPag(){
+  const el=$('venda-pag'); if(!el) return;
+  el.innerHTML=_vLinhas.map((l,i)=>`
+    <div style="margin-bottom:9px">
+      <div style="display:flex;gap:6px;align-items:center">
+        <select class="fc" style="flex:1.1" onchange="_vLinhas[${i}].forma=this.value;renderVendaPag();vendaCalc()">
+          ${V_FORMAS.map(f=>`<option${f===l.forma?' selected':''}>${f}</option>`).join('')}
+        </select>
+        <input class="fc" style="flex:1" type="number" step="0.01" min="0" value="${l.val}" placeholder="0,00" oninput="_vLinhas[${i}].val=this.value;vendaCalc()">
+        ${_vLinhas.length>1?`<button onclick="_vLinhas.splice(${i},1);renderVendaPag();vendaCalc()" style="width:30px;height:30px;border-radius:7px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.1);color:#ef4444;cursor:pointer;flex-shrink:0;font-family:var(--F)">✕</button>`:''}
+      </div>
+      ${V_DEFERIDAS.includes(l.forma)?`<div style="display:flex;align-items:center;gap:7px;margin-top:5px;background:rgba(255,140,66,.07);border:1px solid rgba(255,140,66,.2);border-radius:8px;padding:6px 9px">
+        <span style="font-size:11px;color:var(--orange);white-space:nowrap;font-weight:700">📅 Vence:</span>
+        <input class="fc" type="date" style="flex:1;font-size:12px;padding:5px" value="${l.venc||''}" oninput="_vLinhas[${i}].venc=this.value">
+        <span style="font-size:9px;color:var(--t3);white-space:nowrap">entra no caixa só na baixa</span>
+      </div>`:''}
+    </div>`).join('');
+}
+function vendaAddForma(){ _vLinhas.push({forma:'Dinheiro',val:'',venc:''}); renderVendaPag(); vendaCalc(); }
+function vendaCalc(){
+  const eq=parseFloat($('v-eq')?.value||'0')||0;
+  const mo=parseFloat($('v-mo')?.value||'0')||0;
+  const custo=parseFloat($('v-custo')?.value||'0')||0;
+  const total=eq+mo;
+  set('v-total', fmtR(total));
+  const box=$('v-lucro-box');
+  if(box){
+    if(eq>0||mo>0){
+      box.style.display='block';
+      const lucEq=eq-custo, lucTot=lucEq+mo;
+      const sv=(id,v,forceGreen)=>{const el=$(id);if(el){el.textContent=fmtR(v);el.style.color=v<0?'var(--red)':(forceGreen?'var(--green)':'var(--t1)');}};
+      sv('v-luc-eq',lucEq); sv('v-luc-mo',mo); sv('v-luc-tot',lucTot,true);
+    }else box.style.display='none';
+  }
+  const somado=_vLinhas.reduce((a,l)=>a+(parseFloat(l.val)||0),0);
+  set('v-somado', fmtR(somado));
+  const st=$('v-somado-st');
+  if(st){
+    const rest=total-somado;
+    if(Math.abs(rest)<0.005){st.textContent='✓ bate com o total';st.style.color='var(--green)';}
+    else if(rest>0){st.textContent=`faltam ${fmtR(rest)}`;st.style.color='var(--orange)';}
+    else{st.textContent=`${fmtR(-rest)} a mais`;st.style.color='var(--blue)';}
+  }
+}
+function confirmarVenda(){
+  const cli=($('v-cli')?.value||'').trim();
+  const prod=($('v-prod')?.value||'').trim();
+  const eq=parseFloat($('v-eq')?.value||'0')||0;
+  const mo=parseFloat($('v-mo')?.value||'0')||0;
+  const custo=parseFloat($('v-custo')?.value||'0')||0;
+  const total=eq+mo;
+  if(!cli){toast('⚠️ Informe o cliente!');return;}
+  if(total<=0){toast('⚠️ Informe o valor do equipamento e/ou mão de obra!');return;}
+  const linhas=_vLinhas.filter(l=>(parseFloat(l.val)||0)>0);
+  if(!linhas.length){toast('⚠️ Informe ao menos uma forma de pagamento!');return;}
+  for(const l of linhas){
+    if(V_DEFERIDAS.includes(l.forma) && !l.venc){ toast(`⚠️ Informe a data de vencimento do ${l.forma}!`); return; }
+  }
+  const hojeStr=new Date().toLocaleDateString('pt-BR');
+  const lucro=(eq-custo)+mo;
+  const vendaId=uid();
+  let entrouAgora=0, aReceber=0;
+  const pagResumo=[];
+  DB.movs=DB.movs||[]; DB.cobrancas=DB.cobrancas||[];
+  linhas.forEach(l=>{
+    const v=parseFloat(l.val)||0;
+    const vencFmt=l.venc?new Date(l.venc+'T00:00:00').toLocaleDateString('pt-BR'):'';
+    if(V_DEFERIDAS.includes(l.forma)){
+      // vira cobrança pendente — só entra no caixa quando der baixa
+      DB.cobrancas.push({id:uid(), cliente:cli, descricao:`${l.forma} — ${prod||'Venda'}`, valor:v, vencimento:l.venc, forma:l.forma, pago:false, origem:'venda', vendaId, criadoEm:nowStr()});
+      aReceber+=v;
+      pagResumo.push(`${l.forma}: ${fmtR(v)}${vencFmt?' (vence '+vencFmt+')':''} - a receber`);
+    }else{
+      // entra no caixa agora
+      DB.movs.unshift({id:uid(), tipo:'in', val:String(Math.round(v)), desc:`💰 Venda (${l.forma}) — ${cli}`, ref:`${prod||'Venda'} · ${hojeStr}`, data:new Date().toISOString(), vendaId});
+      entrouAgora+=v;
+      pagResumo.push(`${l.forma}: ${fmtR(v)}`);
+    }
+  });
+  DB.vendas=DB.vendas||[];
+  DB.vendas.unshift({id:vendaId, cli, produtos:prod, valEquip:eq, valMO:mo, custo, total, lucro, data:hojeStr, pagamentos:linhas.map(l=>({forma:l.forma,val:parseFloat(l.val)||0,venc:l.venc||''})), ts:Date.now()});
+  // espelha no histórico do cliente (pra ficha)
+  if(!DB.comprasClientes) DB.comprasClientes={};
+  if(!DB.comprasClientes[cli]) DB.comprasClientes[cli]=[];
+  DB.comprasClientes[cli].push({produto:prod, data:hojeStr, qtd:1, valEquip:eq, valMO:mo, custo, valor:String(total), icone:'📦', desc:'', pagamento:{tipo:'venda',resumo:pagResumo.join(' + ')}, ts:Date.now()});
+  DB.notifs.unshift({ic:'💰',t:`Venda: ${cli}`,sub:`${fmtR(total)} · Lucro ${fmtR(lucro)}`,time:nowStr(),tipo:'success'});
+  adicionarEvento(cli,'venda',`Venda: ${fmtR(total)} (lucro ${fmtR(lucro)})`,'💰');
+  DB._ts=Date.now(); salvarLocal(); jbEnviar(false);
+  const b=$('mod-save-btn'); if(b)b.style.display=''; M.close();
+  rFinanceiro(); if(typeof rCobrancas==='function')rCobrancas(); rNotifs(); updKPI();
+  let msg=`✅ Venda de ${fmtR(total)} registrada!`;
+  if(entrouAgora>0) msg+=` ${fmtR(entrouAgora)} no caixa.`;
+  if(aReceber>0) msg+=` ${fmtR(aReceber)} em boleto/cheque a receber.`;
+  toast(msg);
+}
+// soma o lucro de todas as vendas (para o Dashboard)
+function calcLucroVendas(){
+  return (DB.vendas||[]).reduce((a,v)=>a+(parseFloat(v.lucro)||0),0);
+}
 
 // ═══════════════════════════════════════════════════
 //  🔁 SERVIÇOS RECORRENTES (renda recorrente isolada)
@@ -6666,7 +6840,7 @@ function salvarLocal(){
     const p = {_ts:Date.now()};
     ['empresas','contatos','deals','stages','tasks','contratos','os','agenda',
      'cameras','alertas','notifs','wa','feed','movs','tecnicos','cfgN','waTpls',
-     'equips','feedbacks','orcamentos','metas','cobrancas','comprasClientes','historico','recorrentes'].forEach(k=>{if(DB[k]!==undefined)p[k]=DB[k];});
+     'equips','feedbacks','orcamentos','metas','cobrancas','comprasClientes','historico','recorrentes','vendas'].forEach(k=>{if(DB[k]!==undefined)p[k]=DB[k];});
     p._users        = USERS.map(u=>({...u}));
     p._deleted      = DB._deleted||{};
     p._deletedNomes = DB._deletedNomes||{};
@@ -6685,7 +6859,7 @@ function carregarLocal(){
     const p = JSON.parse(raw);
     ['empresas','contatos','deals','stages','tasks','contratos','os','agenda',
      'cameras','alertas','notifs','wa','feed','movs','tecnicos','cfgN','waTpls',
-     'equips','feedbacks','orcamentos','metas','cobrancas','comprasClientes','historico','recorrentes'].forEach(k=>{if(p[k]!==undefined)DB[k]=p[k];});
+     'equips','feedbacks','orcamentos','metas','cobrancas','comprasClientes','historico','recorrentes','vendas'].forEach(k=>{if(p[k]!==undefined)DB[k]=p[k];});
     if(p._users?.length){ USERS.length=0; p._users.forEach(u=>USERS.push(u)); }
     if(p._deleted)      DB._deleted=p._deleted;
     if(p._deletedNomes) DB._deletedNomes=p._deletedNomes;
@@ -8369,6 +8543,7 @@ async function jbEnviar(manual=false){
       tecnicos:      DB.tecnicos||[],
       movs:          DB.movs||[],
       recorrentes:   DB.recorrentes||[],
+      vendas:        DB.vendas||[],
       agenda:        DB.agenda||{h:[],s:[]},
       historico:     DB.historico||{},
       _users:        USERS.map(u=>({...u})),
@@ -8412,7 +8587,7 @@ function mergeDB(local, nuvem){
   const deleted=DB._deleted;
 
   const camposArray=['empresas','contatos','deals','contratos','os','tasks',
-                     'orcamentos','metas','cobrancas','tecnicos','movs','recorrentes'];
+                     'orcamentos','metas','cobrancas','tecnicos','movs','recorrentes','vendas'];
   camposArray.forEach(k=>{
     const locArr=local[k]||[];
     const nuvArr=nuvem[k];
