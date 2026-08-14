@@ -3929,10 +3929,26 @@ function menuRec(id){
   $('mod-title').innerHTML='⚙️ '+r.cli;
   $('mod-body').innerHTML=`
     <div style="font-size:12px;color:var(--t2);margin-bottom:12px">${r.servico} · ${fmtR(parseR(r.val))}/mês · vence dia ${r.diaVenc}</div>
+    <div class="fg" style="margin-bottom:10px"><label>Valor mensal (R$)</label><input class="fc" id="rec-edit-val" type="number" step="0.01" value="${parseR(r.val)}"></div>
+    <button class="btn bg" style="width:100%;justify-content:center;margin-bottom:8px" onclick="salvarValorRec(${r.id})">💾 Salvar novo valor${r.contratoId?' (atualiza o Contrato também)':''}</button>
     <button class="btn" style="width:100%;justify-content:center;margin-bottom:8px;background:${r.ativo?'rgba(255,140,66,.12)':'rgba(0,217,126,.12)'};color:${r.ativo?'var(--orange)':'var(--green)'}" onclick="toggleRec(${r.id})">${r.ativo?'⏸️ Pausar assinatura':'▶️ Reativar assinatura'}</button>
     <button class="btn br" style="width:100%;justify-content:center" onclick="excluirRec(${r.id})">🗑️ Excluir serviço recorrente</button>`;
   const b=$('mod-save-btn'); if(b)b.style.display='none';
   $('MOD').classList.add('open');
+}
+function salvarValorRec(id){
+  const r=DB.recorrentes.find(x=>String(x.id)===String(id)); if(!r) return;
+  const novoVal=parseFloat($('rec-edit-val')?.value||'0')||0;
+  if(novoVal<=0){toast('⚠️ Informe um valor válido!');return;}
+  r.val=String(novoVal);
+  if(r.contratoId){
+    const c=DB.contratos.find(x=>x.id===r.contratoId);
+    if(c){ c.val=String(novoVal); rContratos(); rDashMetas(); }
+  }
+  DB._ts=Date.now(); salvarLocal(); jbEnviar(false);
+  const b=$('mod-save-btn'); if(b)b.style.display=''; M.close();
+  rRecorrentes(); updKPI();
+  toast(`💾 Valor de ${r.cli} atualizado para ${fmtR(novoVal)}${r.contratoId?' (Contrato também atualizado)':''}!`);
 }
 function toggleRec(id){
   const r=DB.recorrentes.find(x=>String(x.id)===String(id)); if(!r) return;
@@ -5511,6 +5527,21 @@ const M={
         ativo:true, pagamentos:[], proximoVenc, mesRef:primeiro,
         criadoEm:new Date().toLocaleDateString('pt-BR')
       });
+      const _recCriado=DB.recorrentes[0];
+      // Cria automaticamente o Contrato correspondente (evita cadastro duplicado manual)
+      const jaTemContrato=DB.contratos.some(c=>c.cli===cli && c.srv===serv && c.s==='at');
+      if(!jaTemContrato){
+        const iniC=new Date().toLocaleDateString('pt-BR',{month:'short',year:'numeric'});
+        const vencC=new Date(ano+1, mes-1, 1).toLocaleDateString('pt-BR',{month:'short',year:'numeric'}); // renovação anual, ajustável depois
+        const cidC='GA-'+(String(DB.contratos.length+1).padStart(3,'0'));
+        const contratoNovo={id:uid(),cid:cidC,cli,srv:serv,val:String(val),ini:iniC,venc:vencC,s:'at',recId:_recCriado.id};
+        DB.contratos.push(contratoNovo);
+        _recCriado.contratoId=contratoNovo.id;
+        const e=DB.empresas.find(x=>x.nome===cli);if(e){e.s='at';e.val=val;}
+        rContratos();rEmpresas();rTopCli();rCobrancas();rDashMetas();
+        ['ch-rec','ch-fin','ch-ano'].forEach(k=>{if(charts[k]){charts[k].destroy();delete charts[k];}});
+        setTimeout(initCharts,100);
+      }
       DB._ts=Date.now(); salvarLocal(); jbEnviar(false);
       rRecorrentes(); updKPI(); M.close();
       toast(`🔁 ${serv} de ${cli} cadastrado! Vence dia ${dia}.`);return;
