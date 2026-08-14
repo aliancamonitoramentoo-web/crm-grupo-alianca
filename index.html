@@ -386,7 +386,7 @@ body.naoadmin .adm:not(.nav-group){display:none;}
 <div class="sb" id="SIDEBAR">
   <!-- Botão fechar no mobile -->
   <button onclick="toggleSidebar()" style="display:none;position:absolute;top:10px;right:10px;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:18px;width:32px;height:32px;border-radius:8px;cursor:pointer;align-items:center;justify-content:center;z-index:10" id="mob-close-btn">✕</button>
-  <div class="slogo"><div class="smark">⚡</div><div style="flex:1"><div class="sname">Aliance <span style="font-size:9px;color:#00d97e;font-weight:700;background:rgba(0,217,126,.12);padding:1px 6px;border-radius:6px;vertical-align:middle">v65 mobile-fix</span></div><div class="ssub">Gerencie clientes. Feche mais negócios.</div></div><button id="btn-som" onclick="toggleSom()" title="Ligar/desligar sons" style="background:rgba(255,255,255,.08);border:none;color:#fff;font-size:16px;width:34px;height:34px;border-radius:9px;cursor:pointer;flex-shrink:0">🔊</button></div>
+  <div class="slogo"><div class="smark">⚡</div><div style="flex:1"><div class="sname">Aliance <span style="font-size:9px;color:#00d97e;font-weight:700;background:rgba(0,217,126,.12);padding:1px 6px;border-radius:6px;vertical-align:middle">v69 saida-aberta</span></div><div class="ssub">Gerencie clientes. Feche mais negócios.</div></div><button id="btn-som" onclick="toggleSom()" title="Ligar/desligar sons" style="background:rgba(255,255,255,.08);border:none;color:#fff;font-size:16px;width:34px;height:34px;border-radius:9px;cursor:pointer;flex-shrink:0">🔊</button></div>
   <button id="btn-instalar-app" onclick="instalarApp()" style="display:flex;align-items:center;justify-content:center;gap:7px;width:calc(100% - 24px);margin:0 12px 8px;padding:9px;background:linear-gradient(135deg,var(--red),#b3161d);border:none;border-radius:10px;color:#fff;font-size:12px;font-weight:800;cursor:pointer;font-family:var(--F)">📲 Instalar como App</button>
   <nav id="NAV">
 
@@ -548,7 +548,7 @@ body.naoadmin .adm:not(.nav-group){display:none;}
     <div class="fb" onclick="fpipe(this,'ca')">🎥 Cameras / CFTV</div>
     <div class="fb" onclick="fpipe(this,'ra')">📡 Rastreamento</div>
     <div style="margin-left:auto">
-      <button class="btn bg sm adm" onclick="abrirNovaVendaModal()">🔥 + Nova Venda</button>
+      <button class="btn bg sm adm" onclick="abrirNovaVendaModal()">🔥 + Nova Oportunidade</button>
     </div>
   </div>
   <div class="card"><div class="pipe" id="pipe-board"></div></div>
@@ -670,6 +670,7 @@ body.naoadmin .adm:not(.nav-group){display:none;}
     <div class="card"><div class="ch"><span class="ct">Distribuição por Contrato</span><span class="pill pg2">Real</span></div><div class="cb"><div style="height:168px"><canvas id="ch-fin"></canvas></div></div></div>
     <div class="card"><div class="ch"><span class="ct">Lançamentos Financeiros</span><div style="display:flex;gap:6px"><button class="btn sm" style="background:rgba(0,217,126,.14);color:var(--green);font-weight:800" onclick="abrirNovaVenda()">💰 Nova Venda</button><button class="btn bg sm" onclick="M.open('mov')">+ Lançar</button></div></div><div class="cb" id="fin-movs"></div></div>
   </div>
+  <div class="card" style="margin-top:4px"><div class="ch"><span class="ct">💰 Vendas Registradas</span><span class="pill" style="background:rgba(0,217,126,.15);color:var(--green)" id="fin-vendas-count">0</span></div><div class="cb" id="fin-vendas"></div></div>
   <div class="card" style="margin-top:4px"><div class="ch"><span class="ct">💸 Despesas por Categoria</span><span class="pill pr">Saídas</span></div><div class="cb" id="fin-cat"></div></div>
 </div>
 
@@ -1902,10 +1903,11 @@ function updKPI(){
   set('k-con', r.nContratos);
 
   // Receita de vendas: deals fechados (Pipeline) + vendas registradas (Registrar Venda)
-  const recDealsF=r.dealsFechados.reduce((a,d)=>a+parseR(d.val),0);
+  // Exclui deals que já foram registrados como venda (senão conta em dobro)
+  const recDealsF=r.dealsFechados.filter(d=>!d.registradoVenda).reduce((a,d)=>a+parseR(d.val),0);
   const recVendasReg=(DB.vendas||[]).reduce((a,v)=>a+parseR(v.total),0);
   const recVendas=recDealsF+recVendasReg;
-  const nVendasTotal=r.dealsFechados.length+(DB.vendas||[]).length;
+  const nVendasTotal=r.dealsFechados.filter(d=>!d.registradoVenda).length+(DB.vendas||[]).length;
   set('k-vendas', fmtR(recVendas));
   set('k-vendas-d', `${nVendasTotal} venda${nVendasTotal!==1?'s':''}`);
 
@@ -3545,6 +3547,56 @@ function rCentral(){
 }
 
 // ── FINANCEIRO — 100% dados reais ─────────
+// ── Lista de vendas registradas ──
+function rVendas(){
+  const el=$('fin-vendas'); if(!el) return;
+  const vendas=DB.vendas||[];
+  const cnt=$('fin-vendas-count'); if(cnt) cnt.textContent=vendas.length;
+  if(!vendas.length){ el.innerHTML=empty('💰','Nenhuma venda registrada','Use o botão "💰 Nova Venda" para registrar'); return; }
+  el.innerHTML=vendas.map(v=>{
+    const eq=parseFloat(v.valEquip||0)||0, mo=parseFloat(v.valMO||0)||0, custo=parseFloat(v.custo||0)||0;
+    const lucro=parseFloat(v.lucro||0)||0;
+    const pags=(v.pagamentos||[]).map(p=>{
+      const n=parseInt(p.parcelas)||1;
+      return `${p.forma}${n>1?` ${n}x`:''}: ${fmtR(p.val)}`;
+    }).join(' · ');
+    return `<div style="background:var(--s2);border-radius:11px;padding:12px 13px;margin-bottom:9px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:150px">
+          <div style="font-size:14px;font-weight:800;color:var(--t1)">${v.cli}</div>
+          <div style="font-size:11.5px;color:var(--t2);margin-top:1px">📦 ${v.produtos||'Venda'}</div>
+          <div style="font-size:10px;color:var(--t3);margin-top:2px">${v.data||''}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:16px;font-weight:900;font-family:var(--M)">${fmtR(parseR(v.total))}</div>
+          ${lucro>0?`<div style="font-size:11px;color:var(--green);font-weight:800">💚 Lucro ${fmtR(lucro)}</div>`:''}
+        </div>
+      </div>
+      ${(eq>0||mo>0)?`<div style="font-size:10.5px;color:var(--t3);margin-top:6px;padding-top:6px;border-top:1px solid var(--bd)">
+        ${eq>0?`Equipamento ${fmtR(eq)}`:''}${eq>0&&mo>0?' + ':''}${mo>0?`Mão de obra ${fmtR(mo)}`:''}${custo>0?` · Custo ${fmtR(custo)}`:''}
+      </div>`:''}
+      ${pags?`<div style="font-size:10.5px;color:var(--t2);margin-top:4px">💳 ${pags}</div>`:''}
+      <div style="text-align:right;margin-top:6px" class="adm"><button class="btn br sm" style="padding:3px 10px;font-size:10px" onclick="excluirVenda(${v.id})">🗑️ Excluir venda</button></div>
+    </div>`;
+  }).join('');
+}
+// Excluir venda: remove o registro E reverte o que entrou no financeiro/cobranças
+function excluirVenda(id){
+  const v=(DB.vendas||[]).find(x=>String(x.id)===String(id)); if(!v) return;
+  if(!confirm(`Excluir a venda de ${v.cli} (${fmtR(parseR(v.total))})?\n\nIsso vai remover também os lançamentos e boletos gerados por essa venda.`)) return;
+  // remove os movs ligados a essa venda
+  const movsAntes=(DB.movs||[]).length;
+  DB.movs=(DB.movs||[]).filter(m=>String(m.vendaId||'')!==String(id));
+  // remove as cobranças (boletos) ligadas a essa venda
+  DB.cobrancas=(DB.cobrancas||[]).filter(c=>String(c.vendaId||'')!==String(id));
+  // remove a venda
+  DB.vendas=(DB.vendas||[]).filter(x=>String(x.id)!==String(id));
+  registrarDelecao(id);
+  DB._ts=Date.now(); salvarLocal(); jbEnviar(false);
+  rFinanceiro(); if(typeof rCobrancas==='function')rCobrancas(); updKPI();
+  toast(`🗑️ Venda de ${v.cli} excluída e valores revertidos.`);
+}
+
 function rDespesasCategoria(){
   const el=$('fin-cat'); if(!el) return;
   const outs=DB.movs.filter(m=>m.tipo==='out');
@@ -3577,6 +3629,7 @@ function rDespesasCategoria(){
 function rFinanceiro(){
   const m=$('fin-movs'); if(!m) return;
   rDespesasCategoria();
+  if(typeof rVendas==='function') rVendas();
 
   // Atualiza KPIs do financeiro usando calcReceita centralizado
   const r=calcReceita();
@@ -3599,7 +3652,7 @@ function rFinanceiro(){
       <div class="finic" style="background:${bg}">${icone}</div>
       <div style="flex:1">
         <div style="font-size:13px;font-weight:600;color:${isEstorno?'var(--red)':'var(--t1)'}">${mv.desc||'—'}</div>
-        <div style="font-size:11px;color:var(--t2)">${mv.ref||'—'}${isEstorno?` <span style="font-size:9px;background:rgba(239,68,68,.12);color:var(--red);padding:1px 5px;border-radius:4px;font-weight:700">ESTORNO — nao e despesa</span>`:''}</div>
+        <div style="font-size:11px;color:var(--t2)">${mv.dataBR?`📅 ${mv.dataBR} · `:''}${mv.ref||'—'}${isEstorno?` <span style="font-size:9px;background:rgba(239,68,68,.12);color:var(--red);padding:1px 5px;border-radius:4px;font-weight:700">ESTORNO — nao e despesa</span>`:''}</div>
       </div>
       <div style="display:flex;align-items:center;gap:7px">
         <span style="font-size:13px;font-weight:800;font-family:var(--M);color:${corValor}">${sinal} ${fmtR(mv.val)}</span>
@@ -3637,12 +3690,16 @@ function delMov(id){registrarDelecao(id);DB.movs=DB.movs.filter(x=>x.id!==id);rF
 // ═══════════════════════════════════════════════════
 let _vLinhas=[];
 const V_FORMAS=['PIX','Dinheiro','Cartão de Crédito','Cartão de Débito','Transferência','Boleto','Cheque'];
-const V_DEFERIDAS=['Boleto','Cheque']; // só entram no caixa quando dá baixa
+const V_DEFERIDAS=['Boleto','Cheque','Cartão de Crédito']; // só entram no caixa quando dá baixa (crédito cai depois)
 function abrirNovaVenda(preCli){
   _vLinhas=[{forma:'PIX', val:'', venc:'', parcelas:1}];
   $('mod-title').innerHTML='💰 Registrar Venda';
   $('mod-body').innerHTML=`
-    <div class="fg"><label>Cliente *</label><input class="fc" id="v-cli" list="v-cli-dl" placeholder="Nome do cliente" value="${(preCli||'').replace(/"/g,'&quot;')}"><datalist id="v-cli-dl">${DB.empresas.map(e=>`<option value="${e.nome}">`).join('')}</datalist></div>
+    <div class="fg"><label>Cliente *</label><input class="fc" id="v-cli" list="v-cli-dl" placeholder="Nome do cliente" value="${(preCli||'').replace(/"/g,'&quot;')}" oninput="vAtualizaDeals()"><datalist id="v-cli-dl">${DB.empresas.map(e=>`<option value="${e.nome}">`).join('')}</datalist></div>
+    <div class="fg" id="v-deal-wrap" style="display:none"><label>🔗 Esta venda é de um negócio do funil?</label>
+      <select class="fc" id="v-deal"><option value="">Não / venda avulsa</option></select>
+      <div style="font-size:10px;color:var(--t3);margin-top:3px">Se vincular, o negócio é fechado no funil e o valor NÃO conta em dobro.</div>
+    </div>
     <div class="fg"><label>Produtos / Equipamentos *</label><textarea class="fc" id="v-prod" rows="2" placeholder="Ex: 12 Câmeras + DVR + HD + Fonte + Cerca Elétrica"></textarea></div>
     <div class="fg2">
       <div class="fg"><label>💰 Equipamento (venda)</label><input class="fc" id="v-eq" type="number" min="0" step="0.01" placeholder="5000" oninput="vendaCalc()"></div>
@@ -3668,7 +3725,17 @@ function abrirNovaVenda(preCli){
     <button onclick="confirmarVenda()" style="width:100%;padding:12px;background:var(--green);border:none;border-radius:10px;color:#000;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--F)">Registrar Venda</button>`;
   const b=$('mod-save-btn'); if(b)b.style.display='none';
   $('MOD').classList.add('open');
-  renderVendaPag(); vendaCalc();
+  renderVendaPag(); vendaCalc(); vAtualizaDeals();
+}
+// Popula o dropdown com negócios ABERTOS do cliente (pra vincular)
+function vAtualizaDeals(){
+  const cli=($('v-cli')?.value||'').trim();
+  const wrap=$('v-deal-wrap'); const sel=$('v-deal');
+  if(!wrap||!sel) return;
+  const abertos=(DB.deals||[]).filter(d=>d.emp===cli && d.stage<DB.stages.length-1 && !d.cancelado);
+  if(!cli || !abertos.length){ wrap.style.display='none'; sel.innerHTML='<option value="">Não / venda avulsa</option>'; return; }
+  wrap.style.display='block';
+  sel.innerHTML='<option value="">Não / venda avulsa</option>'+abertos.map(d=>`<option value="${d.id}">${TAGL[d.tag]||d.tag||'Negócio'} — ${d.val&&parseR(d.val)>0?fmtR(parseR(d.val)):'sem valor'} (${(DB.stages[d.stage]||{}).n||'em aberto'})</option>`).join('');
 }
 function renderVendaPag(){
   const el=$('venda-pag'); if(!el) return;
@@ -3681,7 +3748,13 @@ function renderVendaPag(){
         <input class="fc" style="flex:1" type="number" step="0.01" min="0" value="${l.val}" placeholder="0,00" oninput="_vLinhas[${i}].val=this.value;vendaCalc()">
         ${_vLinhas.length>1?`<button onclick="_vLinhas.splice(${i},1);renderVendaPag();vendaCalc()" style="width:30px;height:30px;border-radius:7px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.1);color:#ef4444;cursor:pointer;flex-shrink:0;font-family:var(--F)">✕</button>`:''}
       </div>
-      ${V_DEFERIDAS.includes(l.forma)?`<div style="margin-top:5px;background:rgba(255,140,66,.07);border:1px solid rgba(255,140,66,.2);border-radius:8px;padding:8px 9px">
+      ${V_DEFERIDAS.includes(l.forma)?(l.forma==='Cartão de Crédito'?`<div style="margin-top:5px;background:rgba(61,155,255,.07);border:1px solid rgba(61,155,255,.25);border-radius:8px;padding:8px 9px">
+        <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+          <span style="font-size:11px;color:var(--blue);white-space:nowrap;font-weight:700">💳 Previsão de crédito:</span>
+          <input class="fc" type="date" style="flex:1;min-width:130px;font-size:12px;padding:5px" value="${l.venc||''}" oninput="_vLinhas[${i}].venc=this.value;renderVendaPagInfo(${i})">
+        </div>
+        <div id="v-parc-info-${i}" style="font-size:10.5px;color:var(--t3);margin-top:5px"></div>
+      </div>`:`<div style="margin-top:5px;background:rgba(255,140,66,.07);border:1px solid rgba(255,140,66,.2);border-radius:8px;padding:8px 9px">
         <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
           <span style="font-size:11px;color:var(--orange);white-space:nowrap;font-weight:700">📅 1º vence:</span>
           <input class="fc" type="date" style="flex:1;min-width:120px;font-size:12px;padding:5px" value="${l.venc||''}" oninput="_vLinhas[${i}].venc=this.value;renderVendaPagInfo(${i})">
@@ -3690,7 +3763,7 @@ function renderVendaPag(){
           <span style="font-size:11px;color:var(--t2);white-space:nowrap;font-weight:700">${l.forma==='Cheque'?'cheque(s)':'boleto(s)'}</span>
         </div>
         <div id="v-parc-info-${i}" style="font-size:10.5px;color:var(--t3);margin-top:5px"></div>
-      </div>`:''}
+      </div>`):''}
     </div>`).join('');
   // preenche infos das parcelas
   _vLinhas.forEach((l,i)=>{ if(V_DEFERIDAS.includes(l.forma)) renderVendaPagInfo(i); });
@@ -3700,6 +3773,13 @@ function renderVendaPagInfo(i){
   const el=$('v-parc-info-'+i); if(!el) return;
   const l=_vLinhas[i]; if(!l) return;
   const val=parseFloat(l.val)||0;
+  // Cartão de crédito: uma data só de previsão, sem parcelas mensais
+  if(l.forma==='Cartão de Crédito'){
+    l.parcelas=1;
+    if(val<=0 || !l.venc){ el.textContent='Informe o valor e a previsão de quando o crédito cai.'; return; }
+    el.innerHTML=`💳 <b>${fmtR(val)}</b> · previsto para <b style="color:var(--blue)">${new Date(l.venc+'T00:00:00').toLocaleDateString('pt-BR')}</b> · entra no caixa quando você der baixa`;
+    return;
+  }
   const n=parseInt(l.parcelas)||1;
   if(val<=0 || !l.venc){ el.textContent='Preencha valor e 1º vencimento.'; return; }
   const vp=val/n;
@@ -3746,7 +3826,8 @@ function confirmarVenda(){
   const linhas=_vLinhas.filter(l=>(parseFloat(l.val)||0)>0);
   if(!linhas.length){toast('⚠️ Informe ao menos uma forma de pagamento!');return;}
   for(const l of linhas){
-    if(V_DEFERIDAS.includes(l.forma) && !l.venc){ toast(`⚠️ Informe a data de vencimento do ${l.forma}!`); return; }
+    if(l.forma==='Cartão de Crédito'){ l.parcelas=1; if(!l.venc){ toast('⚠️ Informe a previsão de quando o crédito do cartão cai!'); return; } }
+    else if(V_DEFERIDAS.includes(l.forma) && !l.venc){ toast(`⚠️ Informe a data de vencimento do ${l.forma}!`); return; }
   }
   const hojeStr=new Date().toLocaleDateString('pt-BR');
   const lucro=(eq-custo)+mo;
@@ -3776,7 +3857,8 @@ function confirmarVenda(){
       }
       aReceber+=v;
       const vencFmt=new Date(l.venc+'T00:00:00').toLocaleDateString('pt-BR');
-      pagResumo.push(n>1?`${l.forma} ${n}x de ${fmtR(vp)} (1º vence ${vencFmt}) - a receber`:`${l.forma}: ${fmtR(v)} (vence ${vencFmt}) - a receber`);
+      if(l.forma==='Cartão de Crédito') pagResumo.push(`${l.forma}: ${fmtR(v)} (crédito previsto ${vencFmt}) - a receber`);
+      else pagResumo.push(n>1?`${l.forma} ${n}x de ${fmtR(vp)} (1º vence ${vencFmt}) - a receber`:`${l.forma}: ${fmtR(v)} (vence ${vencFmt}) - a receber`);
     }else{
       // entra no caixa agora
       DB.movs.unshift({id:uid(), tipo:'in', val:String(Math.round(v)), desc:`💰 Venda (${l.forma}) — ${cli}`, ref:`${prod||'Venda'} · ${hojeStr}`, data:new Date().toISOString(), vendaId});
@@ -3786,6 +3868,16 @@ function confirmarVenda(){
   });
   DB.vendas=DB.vendas||[];
   DB.vendas.unshift({id:vendaId, cli, produtos:prod, valEquip:eq, valMO:mo, custo, total, lucro, data:hojeStr, pagamentos:linhas.map(l=>({forma:l.forma,val:parseFloat(l.val)||0,venc:l.venc||'',parcelas:parseInt(l.parcelas)||1})), ts:Date.now()});
+  // Se vinculado a um negócio do funil: fecha o deal SEM lançar dinheiro de novo (evita duplicar)
+  const dealVinc=$('v-deal')?.value;
+  if(dealVinc){
+    const d=DB.deals.find(x=>String(x.id)===String(dealVinc));
+    if(d){
+      d.stage=DB.stages.length-1;      // move pra Fechado
+      d.lancado=true;                  // impede o advDeal de lançar mov duplicado
+      d.registradoVenda=vendaId;       // marca que a receita veio da venda (não conta 2x no k-vendas)
+    }
+  }
   // espelha no histórico do cliente (pra ficha)
   if(!DB.comprasClientes) DB.comprasClientes={};
   if(!DB.comprasClientes[cli]) DB.comprasClientes[cli]=[];
@@ -5214,9 +5306,14 @@ const MFRM={
   <div style="font-size:11px;color:var(--t2);background:var(--s2);padding:9px;border-radius:8px;margin-top:4px">💡 Login disponível imediatamente. Edite nome/login/senha diretamente na tela de Usuários.</div>`,
 
   mov:`<div class="fg2"><div class="fg"><label>Tipo *</label><select class="fc" id="f0" onchange="movTipoChange()"><option value="in">💰 Entrada</option><option value="out">💸 Saída</option></select></div><div class="fg"><label>Valor (R$) *</label><input class="fc" id="f1" placeholder="1000"></div></div>
-  <div class="fg" id="mov-cat-wrap" style="display:none"><label>Categoria da saída</label><select class="fc" id="f4"><option>Combustível</option><option>Equipamento / Material</option><option>Salário / Mão de obra</option><option>Aluguel</option><option>Internet / Telefone</option><option>Ferramentas</option><option>Manutenção de veículo</option><option>Impostos / Taxas</option><option>Marketing / Anúncios</option><option>Fornecedor</option><option>Outros</option></select></div>
+  <div class="fg" id="mov-cat-wrap" style="display:none"><label>Categoria / Equipamento</label>
+    <input class="fc" id="f4" list="mov-cat-list" placeholder="Digite ou escolha (ex: DVR 16 canais, Cabo, Câmera...)">
+    <datalist id="mov-cat-list"><option>Combustível</option><option>Equipamento / Material</option><option>Câmera</option><option>DVR</option><option>HD</option><option>Fonte</option><option>Cabo</option><option>Alarme</option><option>Cerca elétrica</option><option>Salário / Mão de obra</option><option>Aluguel</option><option>Internet / Telefone</option><option>Ferramentas</option><option>Manutenção de veículo</option><option>Impostos / Taxas</option><option>Marketing / Anúncios</option><option>Fornecedor</option><option>Outros</option></datalist>
+    <div style="font-size:10px;color:var(--t3);margin-top:3px">Pode digitar o nome do equipamento que quiser.</div>
+  </div>
+  <div class="fg"><label>Data</label><input class="fc" id="f-mov-data" type="date"></div>
   <div class="fg"><label>Descrição</label><input class="fc" id="f2" placeholder="Ex: Gasolina da van, compra de câmeras..."></div>
-  <div class="fg"><label>Referência</label><input class="fc" id="f3" placeholder="Ex: Maio/2026, Nota 123..."></div>`,
+  <div class="fg"><label>Referência</label><input class="fc" id="f3" placeholder="Ex: Nota 123, Fornecedor X..."></div>`,
 
   tecnico:`
     <div class="fg"><label>Nome Completo *</label><input class="fc" id="f0" placeholder="Ex: Adenilson Silva"></div>
@@ -5272,6 +5369,9 @@ const M={
       const dl=$('rec-clientes-dl'); if(dl) dl.innerHTML=DB.empresas.map(e=>`<option value="${e.nome}">`).join('');
       const ds=$('rec-dia'); if(ds) ds.innerHTML=Array.from({length:28},(_,i)=>`<option${i+1===10?' selected':''}>${i+1}</option>`).join('');
       const pm=$('rec-primeiro'); if(pm&&!pm.value) pm.value=new Date().toISOString().slice(0,7);
+    }
+    if(type==='mov'){
+      const md=$('f-mov-data'); if(md&&!md.value) md.value=new Date().toISOString().slice(0,10);
     }
     if(type==='agenda'){
       // Popula datalist de clientes (field livre)
@@ -5567,7 +5667,11 @@ const M={
       const cat=(tipo==='out')?(gv('f4')||'Outros'):'';
       let desc=gv('f2')||'';
       if(tipo==='out'&&cat) desc=desc?`[${cat}] ${desc}`:cat;
-      DB.movs.unshift({id:uid(),tipo,val:String(val),desc,ref:gv('f3'),cat,data:new Date().toISOString()});
+      // data escolhida (ou hoje se vazio)
+      const dataVal=$('f-mov-data')?.value;
+      const dataISO=dataVal?new Date(dataVal+'T12:00:00').toISOString():new Date().toISOString();
+      const dataBR=dataVal?new Date(dataVal+'T12:00:00').toLocaleDateString('pt-BR'):new Date().toLocaleDateString('pt-BR');
+      DB.movs.unshift({id:uid(),tipo,val:String(val),desc,ref:gv('f3'),cat,data:dataISO,dataBR});
       rFinanceiro();updKPI();autoSave();M.close();
       toast(tipo==='out'?`💸 Saída de ${fmtR(val)} registrada!`:`💰 Entrada de ${fmtR(val)} registrada!`);return;
 
@@ -6140,7 +6244,7 @@ function atualizarDivisaoOS(){
 }
 
 function abrirNovaVendaModal(){
-  $('mod-title').textContent='🔥 Nova Venda no Pipeline';
+  $('mod-title').textContent='🔥 Nova Oportunidade no Funil';
   const empOpts=DB.empresas.length
     ?DB.empresas.map(e=>`<option value="${e.nome}">${e.nome}</option>`).join('')
     :'<option value="">Cadastre clientes primeiro</option>';
@@ -6179,7 +6283,7 @@ function abrirNovaVendaModal(){
 
 function abrirVenda(empNome){
   if(!empNome){ toast('⚠️ Selecione um cliente primeiro!'); return; }
-  $('mod-title').textContent=`🔥 Nova Venda — ${empNome}`;
+  $('mod-title').textContent=`🔥 Nova Oportunidade — ${empNome}`;
   $('mod-body').innerHTML=`
     <div style="font-size:12px;color:var(--t2);margin-bottom:12px">Adicionar oportunidade de venda para <strong style="color:var(--t1)">${empNome}</strong> no Pipeline.</div>
     <div class="fg"><label>Serviço de Interesse</label>
