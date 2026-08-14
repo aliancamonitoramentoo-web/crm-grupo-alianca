@@ -398,7 +398,7 @@ body.naoadmin .adm:not(.nav-group){display:none;}
 <div class="sb" id="SIDEBAR">
   <!-- Botão fechar no mobile -->
   <button onclick="toggleSidebar()" style="display:none;position:absolute;top:10px;right:10px;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:18px;width:32px;height:32px;border-radius:8px;cursor:pointer;align-items:center;justify-content:center;z-index:10" id="mob-close-btn">✕</button>
-  <div class="slogo"><div class="smark">⚡</div><div style="flex:1"><div class="sname">Aliance <span style="font-size:9px;color:#00d97e;font-weight:700;background:rgba(0,217,126,.12);padding:1px 6px;border-radius:6px;vertical-align:middle">v62 som</span></div><div class="ssub">Gerencie clientes. Feche mais negócios.</div></div><button id="btn-som" onclick="toggleSom()" title="Ligar/desligar sons" style="background:rgba(255,255,255,.08);border:none;color:#fff;font-size:16px;width:34px;height:34px;border-radius:9px;cursor:pointer;flex-shrink:0">🔊</button></div>
+  <div class="slogo"><div class="smark">⚡</div><div style="flex:1"><div class="sname">Aliance <span style="font-size:9px;color:#00d97e;font-weight:700;background:rgba(0,217,126,.12);padding:1px 6px;border-radius:6px;vertical-align:middle">v63 dash-venda</span></div><div class="ssub">Gerencie clientes. Feche mais negócios.</div></div><button id="btn-som" onclick="toggleSom()" title="Ligar/desligar sons" style="background:rgba(255,255,255,.08);border:none;color:#fff;font-size:16px;width:34px;height:34px;border-radius:9px;cursor:pointer;flex-shrink:0">🔊</button></div>
   <button id="btn-instalar-app" onclick="instalarApp()" style="display:flex;align-items:center;justify-content:center;gap:7px;width:calc(100% - 24px);margin:0 12px 8px;padding:9px;background:linear-gradient(135deg,var(--red),#b3161d);border:none;border-radius:10px;color:#fff;font-size:12px;font-weight:800;cursor:pointer;font-family:var(--F)">📲 Instalar como App</button>
   <nav id="NAV">
 
@@ -1913,10 +1913,13 @@ function updKPI(){
   set('k-recd', `${r.nContratos} contrato${r.nContratos!==1?'s':''} ativos`);
   set('k-con', r.nContratos);
 
-  // Receita de vendas (deals fechados) separada
-  const recVendas=r.dealsFechados.reduce((a,d)=>a+parseR(d.val),0);
+  // Receita de vendas: deals fechados (Pipeline) + vendas registradas (Registrar Venda)
+  const recDealsF=r.dealsFechados.reduce((a,d)=>a+parseR(d.val),0);
+  const recVendasReg=(DB.vendas||[]).reduce((a,v)=>a+parseR(v.total),0);
+  const recVendas=recDealsF+recVendasReg;
+  const nVendasTotal=r.dealsFechados.length+(DB.vendas||[]).length;
   set('k-vendas', fmtR(recVendas));
-  set('k-vendas-d', `${r.dealsFechados.length} venda${r.dealsFechados.length!==1?'s':''} fechada${r.dealsFechados.length!==1?'s':''}`);
+  set('k-vendas-d', `${nVendasTotal} venda${nVendasTotal!==1?'s':''}`);
 
   set('k-lea', leads);
   set('k-os2', osAb);
