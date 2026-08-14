@@ -1170,7 +1170,6 @@ Cliente: Nenhuma ainda, quero instalar..."></textarea>
               <input type="file" accept=".json" style="display:none" onchange="importarBackup(this)">
             </label>
             <button class="btn bgh sm" onclick="trocarNicho()" style="justify-content:center">🔄 Trocar Segmento/Nicho</button>
-            <button class="btn br sm" onclick="confirmarZerarFinanceiro()" style="justify-content:center">🧹 Zerar Entradas/Saídas</button>
             <button class="btn br sm" onclick="confirmarLimpar()" style="justify-content:center">🗑️ Apagar Todos os Dados</button>
           </div>
         </div>
@@ -7003,13 +7002,6 @@ function confirmarLimpar(){
     localStorage.removeItem(STORAGE_KEY);
     _reRenderAll(); toast('🗑️ Dados apagados.');
   } else { toast('Operação cancelada.'); }
-}
-function confirmarZerarFinanceiro(){
-  if(!confirm('⚠️ Isso vai apagar TODOS os lançamentos de Entradas e Saídas (financeiro).\n\nOs Contratos NÃO serão afetados.\n\nDeseja continuar?')) return;
-  DB.movs=[];
-  salvarLocal();
-  _reRenderAll();
-  toast('🧹 Entradas e Saídas zeradas! Contratos preservados.');
 }
 function atualizarBackupStats(){
   const el=$('backup-stats'); if(!el) return;
