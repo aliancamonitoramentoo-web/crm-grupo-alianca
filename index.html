@@ -368,6 +368,8 @@ body.naoadmin .adm:not(.nav-group){display:none;}
   window.addEventListener('load',()=>{
     const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone===true;
     if(standalone){ const btn=document.getElementById('btn-instalar-app'); if(btn) btn.style.display='none'; }
+    // Estado do botão de som
+    try{ const bs=document.getElementById('btn-som'); if(bs) bs.textContent = (localStorage.getItem('alianca_som')==='off')?'🔇':'🔊'; }catch(e){}
   });
 })();
 </script>
@@ -396,7 +398,7 @@ body.naoadmin .adm:not(.nav-group){display:none;}
 <div class="sb" id="SIDEBAR">
   <!-- Botão fechar no mobile -->
   <button onclick="toggleSidebar()" style="display:none;position:absolute;top:10px;right:10px;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:18px;width:32px;height:32px;border-radius:8px;cursor:pointer;align-items:center;justify-content:center;z-index:10" id="mob-close-btn">✕</button>
-  <div class="slogo"><div class="smark">⚡</div><div><div class="sname">Aliance <span style="font-size:9px;color:#00d97e;font-weight:700;background:rgba(0,217,126,.12);padding:1px 6px;border-radius:6px;vertical-align:middle">v61 boleto-parc</span></div><div class="ssub">Gerencie clientes. Feche mais negócios.</div></div></div>
+  <div class="slogo"><div class="smark">⚡</div><div style="flex:1"><div class="sname">Aliance <span style="font-size:9px;color:#00d97e;font-weight:700;background:rgba(0,217,126,.12);padding:1px 6px;border-radius:6px;vertical-align:middle">v62 som</span></div><div class="ssub">Gerencie clientes. Feche mais negócios.</div></div><button id="btn-som" onclick="toggleSom()" title="Ligar/desligar sons" style="background:rgba(255,255,255,.08);border:none;color:#fff;font-size:16px;width:34px;height:34px;border-radius:9px;cursor:pointer;flex-shrink:0">🔊</button></div>
   <button id="btn-instalar-app" onclick="instalarApp()" style="display:flex;align-items:center;justify-content:center;gap:7px;width:calc(100% - 24px);margin:0 12px 8px;padding:9px;background:linear-gradient(135deg,var(--red),#b3161d);border:none;border-radius:10px;color:#fff;font-size:12px;font-weight:800;cursor:pointer;font-family:var(--F)">📲 Instalar como App</button>
   <nav id="NAV">
 
@@ -1168,6 +1170,7 @@ Cliente: Nenhuma ainda, quero instalar..."></textarea>
               <input type="file" accept=".json" style="display:none" onchange="importarBackup(this)">
             </label>
             <button class="btn bgh sm" onclick="trocarNicho()" style="justify-content:center">🔄 Trocar Segmento/Nicho</button>
+            <button class="btn br sm" onclick="confirmarZerarFinanceiro()" style="justify-content:center">🧹 Zerar Entradas/Saídas</button>
             <button class="btn br sm" onclick="confirmarLimpar()" style="justify-content:center">🗑️ Apagar Todos os Dados</button>
           </div>
         </div>
@@ -1462,12 +1465,67 @@ const dateStr=()=>new Date().toLocaleDateString('pt-BR');
 const empty=(ic,t,s)=>`<div class="empty"><div class="ei">${ic}</div><div class="et">${t}</div><div class="es">${s}</div></div>`;
 
 // ── TOAST ──────────────────────────────────
-function toast(msg){
+// ── SISTEMA DE SOM (Web Audio — gerado na hora, sem arquivos) ──
+let _audioCtx=null;
+function _getAudio(){
+  try{ if(!_audioCtx) _audioCtx=new (window.AudioContext||window.webkitAudioContext)(); if(_audioCtx.state==='suspended')_audioCtx.resume(); return _audioCtx; }catch(e){ return null; }
+}
+// som ligado? (guardado no localStorage, ligado por padrão)
+function somAtivo(){ return localStorage.getItem('alianca_som')!=='off'; }
+function toggleSom(){
+  const novo = somAtivo() ? 'off' : 'on';
+  localStorage.setItem('alianca_som', novo);
+  const b=$('btn-som'); if(b) b.textContent = novo==='off' ? '🔇' : '🔊';
+  if(novo==='on') tocarSom('ok');
+  toast(novo==='off'?'🔇 Sons desativados':'🔊 Sons ativados');
+}
+// toca uma sequência de notas: cada uma [frequência, duração, tipo]
+function _beep(notas){
+  const ctx=_getAudio(); if(!ctx) return;
+  let t=ctx.currentTime;
+  notas.forEach(([freq,dur,tipo])=>{
+    const osc=ctx.createOscillator(), gain=ctx.createGain();
+    osc.type=tipo||'sine'; osc.frequency.value=freq;
+    gain.gain.setValueAtTime(0.0001,t);
+    gain.gain.exponentialRampToValueAtTime(0.22,t+0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(t); osc.stop(t+dur+0.02);
+    t+=dur;
+  });
+}
+// biblioteca de sons por tipo de evento
+const _SONS={
+  ok:      [[660,0.09,'sine'],[880,0.12,'sine']],                 // confirmação leve
+  venda:   [[523,0.1,'triangle'],[659,0.1,'triangle'],[784,0.16,'triangle']], // dó-mi-sol (alegre, dinheiro)
+  dinheiro:[[784,0.08,'sine'],[1047,0.14,'sine']],                // "caixa registradora"
+  alerta:  [[440,0.14,'square'],[440,0.14,'square']],             // atenção
+  erro:    [[300,0.16,'sawtooth'],[220,0.2,'sawtooth']],          // erro (grave)
+  notif:   [[880,0.08,'sine'],[1174,0.1,'sine']]                  // notificação
+};
+function tocarSom(tipo){
+  if(!somAtivo()) return;
+  const s=_SONS[tipo]||_SONS.ok;
+  try{ _beep(s); }catch(e){}
+}
+
+function toast(msg, tipoSom){
   const el=$('TOAST'); if(!el){ console.log('[toast]',msg); return; }
   el.innerHTML=`<span>✅</span><span>${msg}</span>`;
   el.classList.add('show');
   clearTimeout(el._t);
   el._t=setTimeout(()=>el.classList.remove('show'),3200);
+  // som automático conforme o conteúdo do aviso
+  if(tipoSom!==false){
+    let t=tipoSom;
+    if(!t){
+      if(/⚠️|erro|inválid|falh/i.test(msg)) t='erro';
+      else if(/venda|lucro/i.test(msg)) t='venda';
+      else if(/pago|recebi|caixa|R\$/i.test(msg)) t='dinheiro';
+      else t='ok';
+    }
+    tocarSom(t);
+  }
 }
 
 // ── RELÓGIO ───────────────────────────────
@@ -3715,6 +3773,7 @@ function confirmarVenda(){
   DB._ts=Date.now(); salvarLocal(); jbEnviar(false);
   const b=$('mod-save-btn'); if(b)b.style.display=''; M.close();
   rFinanceiro(); if(typeof rCobrancas==='function')rCobrancas(); rNotifs(); updKPI();
+  tocarSom('venda');
   let msg=`✅ Venda de ${fmtR(total)} registrada!`;
   if(entrouAgora>0) msg+=` ${fmtR(entrouAgora)} no caixa.`;
   if(aReceber>0) msg+=` ${fmtR(aReceber)} em boleto/cheque a receber.`;
@@ -6944,6 +7003,13 @@ function confirmarLimpar(){
     localStorage.removeItem(STORAGE_KEY);
     _reRenderAll(); toast('🗑️ Dados apagados.');
   } else { toast('Operação cancelada.'); }
+}
+function confirmarZerarFinanceiro(){
+  if(!confirm('⚠️ Isso vai apagar TODOS os lançamentos de Entradas e Saídas (financeiro).\n\nOs Contratos NÃO serão afetados.\n\nDeseja continuar?')) return;
+  DB.movs=[];
+  salvarLocal();
+  _reRenderAll();
+  toast('🧹 Entradas e Saídas zeradas! Contratos preservados.');
 }
 function atualizarBackupStats(){
   const el=$('backup-stats'); if(!el) return;
