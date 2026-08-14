@@ -1170,6 +1170,7 @@ Cliente: Nenhuma ainda, quero instalar..."></textarea>
               <input type="file" accept=".json" style="display:none" onchange="importarBackup(this)">
             </label>
             <button class="btn bgh sm" onclick="trocarNicho()" style="justify-content:center">🔄 Trocar Segmento/Nicho</button>
+            <button class="btn br sm" onclick="confirmarZerarFinanceiro()" style="justify-content:center">🧹 Zerar Pipeline, Financeiro e Vendas</button>
             <button class="btn br sm" onclick="confirmarLimpar()" style="justify-content:center">🗑️ Apagar Todos os Dados</button>
           </div>
         </div>
@@ -2123,7 +2124,7 @@ function rPipeline(){
     let deals=DB.deals.filter(d=>d.stage===si&&!d.cancelado);
     if(_pf)deals=deals.filter(d=>d.tag===_pf);
     const tot=deals.reduce((a,d)=>a+parseR(d.val),0);
-    const cancelados=DB.deals.filter(d=>d.stage===si&&d.cancelado);
+    const cancelados=DB.deals.filter(d=>d.stage===si&&d.cancelado&&!d.arquivado);
 
     // Coluna Fechado — limpa, só total + botão Gerenciar
     if(isFechado){
@@ -2134,7 +2135,7 @@ function rPipeline(){
           <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.8px">Total Fechado</div>
           <div style="font-size:28px;font-weight:900;color:var(--green)">${fmtR(Math.round(tot))}</div>
           <div style="font-size:12px;color:var(--t3)">${deals.length} venda(s)</div>
-          ${cancelados.length?`<div style="font-size:10px;color:#ef4444;margin-top:2px">🚫 ${cancelados.length} cancelado(s)</div>`:''}
+          ${cancelados.length?`<div style="font-size:10px;color:#ef4444;margin-top:2px">🚫 ${cancelados.length} cancelado(s) ${adm?`<span onclick="arquivarCancelados()" style="text-decoration:underline;cursor:pointer;color:var(--t2);margin-left:4px">limpar</span>`:''}</div>`:''}
           <button onclick="gerenciarVendasFechadas()" style="margin-top:10px;font-size:11px;padding:5px 16px;color:var(--t2);background:var(--s2);border:1px solid var(--bd);border-radius:20px;cursor:pointer">⚙️ Gerenciar</button>
         </div>
       </div>`;
@@ -2203,6 +2204,16 @@ function moverParaFunil(id){
   toast(`↩ ${d.emp} voltou para o funil!`);
 }
 function editDeal(id,f,v){const d=DB.deals.find(x=>x.id===id);if(d){d[f]=v.trim();}}
+function arquivarCancelados(){
+  if(!isAdmin()){toast('⛔ Apenas administradores podem fazer isso!');return;}
+  const n=DB.deals.filter(d=>d.cancelado&&!d.arquivado).length;
+  if(!n){toast('Nenhum cancelado para limpar.');return;}
+  if(!confirm(`Isso vai tirar ${n} negócio(s) cancelado(s) da contagem do Pipeline.\n\nEles continuam registrados no histórico do cliente — não são apagados.\n\nContinuar?`))return;
+  DB.deals.forEach(d=>{ if(d.cancelado) d.arquivado=true; });
+  salvarLocal();
+  rPipeline(); updKPI();
+  toast('🧹 Cancelados arquivados! Continuam no histórico do cliente.');
+}
 function editDealVal(id,v){const d=DB.deals.find(x=>x.id===id);if(d){d.val=String(parseR(v));updKPI();}}
 function delDeal(id){
   // Colaboradores não podem nem remover
@@ -7002,6 +7013,15 @@ function confirmarLimpar(){
     localStorage.removeItem(STORAGE_KEY);
     _reRenderAll(); toast('🗑️ Dados apagados.');
   } else { toast('Operação cancelada.'); }
+}
+function confirmarZerarFinanceiro(){
+  if(!confirm('⚠️ Isso vai apagar TODOS os lançamentos de Entradas/Saídas (Financeiro), TODO o Pipeline (negócios/leads) e TODAS as Vendas.\n\nClientes e Contratos NÃO serão afetados.\n\nDeseja continuar?')) return;
+  DB.movs=[];
+  DB.deals=[];
+  DB.vendas=[];
+  salvarLocal();
+  _reRenderAll();
+  toast('🧹 Pipeline, Financeiro e Vendas zerados! Clientes e Contratos preservados.');
 }
 function atualizarBackupStats(){
   const el=$('backup-stats'); if(!el) return;
