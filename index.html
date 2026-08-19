@@ -386,7 +386,7 @@ body.naoadmin .adm:not(.nav-group){display:none;}
 <div class="sb" id="SIDEBAR">
   <!-- Botão fechar no mobile -->
   <button onclick="toggleSidebar()" style="display:none;position:absolute;top:10px;right:10px;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:18px;width:32px;height:32px;border-radius:8px;cursor:pointer;align-items:center;justify-content:center;z-index:10" id="mob-close-btn">✕</button>
-  <div class="slogo"><div class="smark">⚡</div><div style="flex:1"><div class="sname">Aliance <span style="font-size:9px;color:#00d97e;font-weight:700;background:rgba(0,217,126,.12);padding:1px 6px;border-radius:6px;vertical-align:middle">v73 meta-recorrente</span></div><div class="ssub">Gerencie clientes. Feche mais negócios.</div></div><button id="btn-som" onclick="toggleSom()" title="Ligar/desligar sons" style="background:rgba(255,255,255,.08);border:none;color:#fff;font-size:16px;width:34px;height:34px;border-radius:9px;cursor:pointer;flex-shrink:0">🔊</button></div>
+  <div class="slogo"><div class="smark">⚡</div><div style="flex:1"><div class="sname">Aliance <span style="font-size:9px;color:#00d97e;font-weight:700;background:rgba(0,217,126,.12);padding:1px 6px;border-radius:6px;vertical-align:middle">v74 proposta-itens</span></div><div class="ssub">Gerencie clientes. Feche mais negócios.</div></div><button id="btn-som" onclick="toggleSom()" title="Ligar/desligar sons" style="background:rgba(255,255,255,.08);border:none;color:#fff;font-size:16px;width:34px;height:34px;border-radius:9px;cursor:pointer;flex-shrink:0">🔊</button></div>
   <button id="btn-instalar-app" onclick="instalarApp()" style="display:flex;align-items:center;justify-content:center;gap:7px;width:calc(100% - 24px);margin:0 12px 8px;padding:9px;background:linear-gradient(135deg,var(--red),#b3161d);border:none;border-radius:10px;color:#fff;font-size:12px;font-weight:800;cursor:pointer;font-family:var(--F)">📲 Instalar como App</button>
   <nav id="NAV">
 
@@ -2940,7 +2940,7 @@ function gerarPDFOS(id){
     // ── Footer ──
     doc.setFillColor(245,166,35); doc.rect(0,285,PW,12,'F');
     doc.setTextColor(0,0,0); doc.setFontSize(8); doc.setFont('helvetica','normal');
-    doc.text('Aliance CRM · {nicho} Profissional',M,292);
+    doc.text('Aliance CRM · Seguranca Eletronica',M,292);
     doc.text(`OS ${o.oid} · ${o.data||''}`,PW-M-50,292);
 
     doc.save(`OS_${o.oid}_${(o.cli||'').replace(/\s/g,'_')}.pdf`);
@@ -7426,7 +7426,7 @@ function rAdmServicos(){
   setTimeout(initCharts,100);
 }
 function adminAddServico(){
-  const nome=prompt('Nome do serviço (ex: 🔒 {nicho}):','');
+  const nome=prompt('Nome do serviço (ex: Monitoramento 24h):','');
   if(!nome?.trim()) return;
   const key='srv'+Date.now();
   DB.adminCfg.servicos.push({key,label:nome.trim(),cor:'#7a96bb'});
@@ -7976,10 +7976,11 @@ function salvarProposta(idx){
   if(!cli||!titulo){toast('⚠️ Informe cliente e título!');return;}
   const rows=[...$('pr-itens').querySelectorAll('div')];
   const itens=rows.map(row=>({
-    desc: row.querySelector('[data-field="desc"]')?.value.trim()||'Item',
+    desc: row.querySelector('[data-field="desc"]')?.value.trim()||'',
     qtd:  parseInt(row.querySelector('[data-field="qtd"]')?.value)||1,
     preco:parseFloat(row.querySelector('[data-field="preco"]')?.value)||0,
-  })).filter(it=>it.desc&&it.preco>0);
+  })).filter(it=>it.desc); // mantém todo item que você escreveu, mesmo sem preço (ex: item incluso/cortesia)
+  if(!itens.length){toast('⚠️ Adicione pelo menos um item com descrição!');return;}
   const desconto=parseFloat($('pr-desc')?.value)||0;
   const subtotal=itens.reduce((a,it)=>a+it.qtd*it.preco,0);
   const total=subtotal-desconto;
@@ -8009,7 +8010,7 @@ function gerarPDF(idx){
     doc.setFontSize(22); doc.setFont('helvetica','bold');
     doc.text('Aliance CRM',M,16);
     doc.setFontSize(10); doc.setFont('helvetica','normal');
-    doc.text('{nicho} Profissional',M,23);
+    doc.text('Solucoes em Seguranca Eletronica',M,23);
     doc.text(`Proposta Nº ${p.id} · ${p.data}`,M,29);
     // Título
     doc.setTextColor(245,166,35); doc.setFontSize(16); doc.setFont('helvetica','bold');
