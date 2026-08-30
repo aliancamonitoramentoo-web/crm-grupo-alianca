@@ -1850,14 +1850,26 @@ function calcDRE(dataIniStr, dataFimStr){
   const estornos = estornosMov.reduce((a,m)=>a+parseR(m.val),0);
   const despesas = saidasMov.reduce((a,m)=>a+parseR(m.val),0);
 
-  // Receita recorrente (contratos ativos) — estimada: MRR atual × nº de meses no período
-  let mesesNoPeriodo=1;
+  // Receita recorrente: soma o MRR REAL de cada mês do período usando os
+  // snapshots salvos (DB.mrrSnapshots). Meses sem snapshot (período antes
+  // de começarmos a salvar, ou mês futuro) usam o MRR atual como estimativa.
+  const contratosAtivosHoje=DB.contratos.filter(c=>c.s==='at');
+  const mrrHoje=contratosAtivosHoje.reduce((a,c)=>a+parseR(c.val),0);
+  let mesesNoPeriodo=1, receitaRecorrente=0, mesesEstimados=0, mesesReais=0;
   if(ini && fim){
-    mesesNoPeriodo = Math.max(1, Math.round((fim-ini)/(1000*60*60*24*30.44)));
+    const meses=[];
+    let cursor=new Date(ini.getFullYear(),ini.getMonth(),1);
+    const limite=new Date(fim.getFullYear(),fim.getMonth(),1);
+    while(cursor<=limite){ meses.push(cursor.getFullYear()+'-'+String(cursor.getMonth()+1).padStart(2,'0')); cursor=new Date(cursor.getFullYear(),cursor.getMonth()+1,1); }
+    mesesNoPeriodo=Math.max(1,meses.length);
+    meses.forEach(mesKey=>{
+      const snap=(DB.mrrSnapshots||[]).find(s=>s.mes===mesKey);
+      if(snap){ receitaRecorrente+=snap.valor; mesesReais++; }
+      else { receitaRecorrente+=mrrHoje; mesesEstimados++; }
+    });
+  } else {
+    receitaRecorrente=mrrHoje; mesesEstimados=1;
   }
-  const contratosAtivos=DB.contratos.filter(c=>c.s==='at');
-  const mrr=contratosAtivos.reduce((a,c)=>a+parseR(c.val),0);
-  const receitaRecorrente = mrr*mesesNoPeriodo;
 
   const receitaTotal = receitaVendas + receitaRecorrente - estornos;
   const resultado = receitaTotal - despesas;
@@ -1883,6 +1895,7 @@ function calcDRE(dataIniStr, dataFimStr){
     despesas, despesasPorCategoria:cats, resultado,
     despesasFixas, despesasVariaveis, catsFixas, catsVariaveis,
     mesesNoPeriodo, semData,
+    mesesReais, mesesEstimados,
     nLancamentos: entradasMov.length+saidasMov.length
   };
 }
@@ -3800,7 +3813,7 @@ function gerarDRE(){
     </div>
     <div style="font-size:12px;color:var(--t2);border-top:1px solid var(--bd);padding-top:10px;margin-bottom:14px">
       <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Receita de vendas/pagamentos (período)</span><span style="font-weight:700">${fmtR(r.receitaVendas)}</span></div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Receita recorrente estimada (${r.mesesNoPeriodo} mês${r.mesesNoPeriodo>1?'es':''} × contratos ativos hoje)</span><span style="font-weight:700">${fmtR(r.receitaRecorrente)}</span></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Receita recorrente (${r.mesesReais} mês${r.mesesReais!==1?'es':''} real${r.mesesReais!==1?'is':''}${r.mesesEstimados>0?` + ${r.mesesEstimados} estimado${r.mesesEstimados>1?'s':''}`:''})</span><span style="font-weight:700">${fmtR(r.receitaRecorrente)}</span></div>
       ${r.estornos>0?`<div style="display:flex;justify-content:space-between;margin-bottom:4px;color:var(--red)"><span>(–) Estornos</span><span style="font-weight:700">-${fmtR(r.estornos)}</span></div>`:''}
     </div>
 
@@ -12742,6 +12755,27 @@ function popularHistoricoSel(){
     +DB.empresas.map(e=>`<option value="${e.nome}"${e.nome===_histCliente?' selected':''}>${e.nome}</option>`).join('');
 }
 
+// ── Snapshot mensal de MRR (receita recorrente) ──────────
+// Toda vez que o CRM é aberto, garante que o mês atual tenha um
+// registro com o MRR REAL daquele momento (soma dos contratos ativos
+// hoje). Assim, com o passar dos meses, o histórico fica preciso —
+// sem depender de "estimar pra trás" com o valor de hoje.
+function snapshotMRR(){
+  DB.mrrSnapshots=DB.mrrSnapshots||[];
+  const hoje=new Date();
+  const mesKey=hoje.getFullYear()+'-'+String(hoje.getMonth()+1).padStart(2,'0');
+  const contratosAtivos=(DB.contratos||[]).filter(c=>c.s==='at');
+  const mrrAtual=contratosAtivos.reduce((a,c)=>a+parseR(c.val),0);
+  const existente=DB.mrrSnapshots.find(s=>s.mes===mesKey);
+  if(existente){
+    // Atualiza o valor do mês corrente (pode subir/cair contratos no mesmo mês)
+    existente.valor=mrrAtual; existente.nContratos=contratosAtivos.length;
+  } else {
+    DB.mrrSnapshots.push({mes:mesKey, valor:mrrAtual, nContratos:contratosAtivos.length});
+    if(typeof salvarLocal==='function') salvarLocal();
+  }
+}
+
 function initApp(){
   if(!DB.equips)      DB.equips={};
   if(!DB.feedbacks)   DB.feedbacks={};
@@ -12753,6 +12787,7 @@ function initApp(){
   if(!DB.metas)       DB.metas=[];
   if(!DB.cobrancas)       DB.cobrancas=[];
   if(!DB.comprasClientes) DB.comprasClientes={};
+  if(!DB.mrrSnapshots)    DB.mrrSnapshots=[];
 
   // Migra estornos antigos que foram salvos como tipo:'out' com Estorno no desc
   let migrou=false;
@@ -12778,12 +12813,14 @@ function initApp(){
   // Carrega dados
   if(modoBackend){
     carregarTodosDados().then(()=>{
+      snapshotMRR();
       _reRenderAll(); rAdminPanel();
       setTimeout(initCharts,300);
       setInterval(async()=>{ if(modoBackend) await carregarTodosDados().then(()=>updAll()).catch(()=>{}); }, 30000);
     });
   } else {
     carregarLocal();
+    snapshotMRR();
     rTopCli();rPipeline();rClientes();rCentral();rOS();rTasks();
     rContratos();rAgenda();rEquipe();rFinanceiro();rCobrancas();rNotifs();
     rWA();rFunil();rResumo();rCfgNotifs();rTecnicos();rUsuarios();rMapa();
