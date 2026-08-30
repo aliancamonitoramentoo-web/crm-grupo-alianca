@@ -3676,7 +3676,7 @@ function abrirNovaSaida(){
       <div class="fg"><label>Data da compra</label><input class="fc" id="sd-data" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
     </div>
     <div class="fg2">
-      <div class="fg"><label>Categoria</label><input class="fc" id="sd-cat" list="sd-cat-list" placeholder="Ex: Equipamento"><datalist id="sd-cat-list"><option>Equipamento / Material</option><option>Combustível</option><option>Ferramentas</option><option>Fornecedor</option><option>Manutenção de veículo</option><option>Outros</option></datalist></div>
+      <div class="fg"><label>Categoria</label><input class="fc" id="sd-cat" list="sd-cat-list" placeholder="Ex: Equipamento"><datalist id="sd-cat-list"><option>Salário / Mão de obra</option><option>Aluguel</option><option>Equipamento / Material</option><option>Combustível</option><option>Ferramentas</option><option>Fornecedor</option><option>Manutenção de veículo</option><option>Outros</option></datalist></div>
       <div class="fg"><label>Cliente (opcional)</label><input class="fc" id="sd-cli" list="sd-cli-dl" placeholder="Compra pra qual cliente?"><datalist id="sd-cli-dl">${DB.empresas.map(e=>`<option value="${e.nome}">`).join('')}</datalist></div>
     </div>
     <label style="font-size:11px;color:var(--t3);font-weight:700">Itens comprados (um por um)</label>
