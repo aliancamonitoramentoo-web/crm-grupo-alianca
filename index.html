@@ -1824,6 +1824,14 @@ function calcReceita(){
 // ── DRE por período personalizável ──────────────────────
 // Usa a data real (ISO) de cada lançamento. Lançamentos antigos sem
 // data ficam de fora do período (entram no total geral, mas não no DRE).
+
+// Categorias tratadas como despesa FIXA (recorrente todo mês, indepen-
+// dente de venda). Tudo que não estiver aqui é considerado VARIÁVEL.
+// Comparação sem acento/maiúsculas pra não falhar por digitação.
+const CATS_FIXAS=['aluguel','salario / mao de obra','salario','folha de pagamento','internet / telefone','internet/telefone','internet','telefone','contador','contabilidade','sistema/software','software','seguro'];
+function normCat(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim(); }
+function isCatFixa(cat){ return CATS_FIXAS.includes(normCat(cat)); }
+
 function calcDRE(dataIniStr, dataFimStr){
   const ini = dataIniStr ? new Date(dataIniStr+'T00:00:00') : null;
   const fim = dataFimStr ? new Date(dataFimStr+'T23:59:59') : null;
@@ -1858,12 +1866,22 @@ function calcDRE(dataIniStr, dataFimStr){
   const cats={};
   saidasMov.forEach(m=>{ const c=(m.cat&&m.cat.trim())||'Outros'; cats[c]=(cats[c]||0)+parseR(m.val); });
 
+  // Despesas fixas x variáveis
+  let despesasFixas=0, despesasVariaveis=0;
+  const catsFixas={}, catsVariaveis={};
+  saidasMov.forEach(m=>{
+    const c=(m.cat&&m.cat.trim())||'Outros', v=parseR(m.val);
+    if(isCatFixa(c)){ despesasFixas+=v; catsFixas[c]=(catsFixas[c]||0)+v; }
+    else { despesasVariaveis+=v; catsVariaveis[c]=(catsVariaveis[c]||0)+v; }
+  });
+
   // Sem data (fora de qualquer período — aviso pro usuário)
   const semData = DB.movs.filter(m=>!m.data && m.tipo!=='estorno').length;
 
   return {
     receitaVendas, receitaRecorrente, estornos, receitaTotal,
     despesas, despesasPorCategoria:cats, resultado,
+    despesasFixas, despesasVariaveis, catsFixas, catsVariaveis,
     mesesNoPeriodo, semData,
     nLancamentos: entradasMov.length+saidasMov.length
   };
@@ -3761,7 +3779,10 @@ function gerarDRE(){
   if(new Date(ini)>new Date(fim)){ el.innerHTML=`<div style="color:var(--red);font-size:12px;padding:8px 0">A data "De" não pode ser depois da data "Até".</div>`; return; }
   const r=calcDRE(ini,fim);
   const cor=r.resultado>=0?'var(--green)':'var(--red)';
-  const cats=Object.entries(r.despesasPorCategoria).sort((a,b)=>b[1]-a[1]);
+  const catsFixas=Object.entries(r.catsFixas).sort((a,b)=>b[1]-a[1]);
+  const catsVar=Object.entries(r.catsVariaveis).sort((a,b)=>b[1]-a[1]);
+  const pctFixo=r.despesas>0?(r.despesasFixas/r.despesas*100):0;
+  const pctVar=r.despesas>0?(r.despesasVariaveis/r.despesas*100):0;
   el.innerHTML=`
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px">
       <div style="background:var(--s2);border-radius:10px;padding:10px 12px">
@@ -3777,19 +3798,42 @@ function gerarDRE(){
         <div style="font-size:17px;font-weight:900;color:${cor};font-family:var(--M)">${fmtR(r.resultado)}</div>
       </div>
     </div>
-    <div style="font-size:12px;color:var(--t2);border-top:1px solid var(--bd);padding-top:10px;margin-bottom:10px">
+    <div style="font-size:12px;color:var(--t2);border-top:1px solid var(--bd);padding-top:10px;margin-bottom:14px">
       <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Receita de vendas/pagamentos (período)</span><span style="font-weight:700">${fmtR(r.receitaVendas)}</span></div>
       <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Receita recorrente estimada (${r.mesesNoPeriodo} mês${r.mesesNoPeriodo>1?'es':''} × contratos ativos hoje)</span><span style="font-weight:700">${fmtR(r.receitaRecorrente)}</span></div>
       ${r.estornos>0?`<div style="display:flex;justify-content:space-between;margin-bottom:4px;color:var(--red)"><span>(–) Estornos</span><span style="font-weight:700">-${fmtR(r.estornos)}</span></div>`:''}
     </div>
-    ${cats.length?`<div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Despesas por categoria (período)</div>
-    ${cats.map(([cat,val])=>{
-      const pct=r.despesas>0?(val/r.despesas*100):0;
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px">
+      <div style="background:rgba(255,69,96,.08);border:1px solid rgba(255,69,96,.25);border-radius:10px;padding:10px 12px">
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">🔒 Despesas Fixas</div>
+        <div style="font-size:16px;font-weight:900;color:var(--red);font-family:var(--M)">${fmtR(r.despesasFixas)}</div>
+        <div style="font-size:10px;color:var(--t3)">${pctFixo.toFixed(0)}% do total</div>
+      </div>
+      <div style="background:rgba(255,140,66,.08);border:1px solid rgba(255,140,66,.25);border-radius:10px;padding:10px 12px">
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">📉 Despesas Variáveis</div>
+        <div style="font-size:16px;font-weight:900;color:var(--orange);font-family:var(--M)">${fmtR(r.despesasVariaveis)}</div>
+        <div style="font-size:10px;color:var(--t3)">${pctVar.toFixed(0)}% do total</div>
+      </div>
+    </div>
+
+    ${catsFixas.length?`<div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin:14px 0 8px">🔒 Fixas por categoria</div>
+    ${catsFixas.map(([cat,val])=>{
+      const pct=r.despesasFixas>0?(val/r.despesasFixas*100):0;
       return `<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">
         <span style="color:var(--t2)">${cat}</span>
         <span style="color:var(--t1);font-weight:700">${fmtR(val)} <span style="color:var(--t3);font-size:10px">(${pct.toFixed(0)}%)</span></span>
       </div>`;
-    }).join('')}`:`<div style="font-size:12px;color:var(--t3)">Sem despesas lançadas nesse período.</div>`}
+    }).join('')}`:''}
+    ${catsVar.length?`<div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin:14px 0 8px">📉 Variáveis por categoria</div>
+    ${catsVar.map(([cat,val])=>{
+      const pct=r.despesasVariaveis>0?(val/r.despesasVariaveis*100):0;
+      return `<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">
+        <span style="color:var(--t2)">${cat}</span>
+        <span style="color:var(--t1);font-weight:700">${fmtR(val)} <span style="color:var(--t3);font-size:10px">(${pct.toFixed(0)}%)</span></span>
+      </div>`;
+    }).join('')}`:''}
+    ${!catsFixas.length && !catsVar.length?`<div style="font-size:12px;color:var(--t3)">Sem despesas lançadas nesse período.</div>`:''}
     ${r.semData>0?`<div style="margin-top:12px;font-size:11px;color:var(--orange);background:rgba(255,140,66,.1);padding:8px 10px;border-radius:8px">⚠️ Existem ${r.semData} lançamento${r.semData>1?'s':''} antigo${r.semData>1?'s':''} sem data registrada — não entram nesse período, mas continuam contando no financeiro geral.</div>`:''}
   `;
 }
