@@ -386,7 +386,7 @@ body.naoadmin .adm:not(.nav-group){display:none;}
 <div class="sb" id="SIDEBAR">
   <!-- Botão fechar no mobile -->
   <button onclick="toggleSidebar()" style="display:none;position:absolute;top:10px;right:10px;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:18px;width:32px;height:32px;border-radius:8px;cursor:pointer;align-items:center;justify-content:center;z-index:10" id="mob-close-btn">✕</button>
-  <div class="slogo"><div class="smark">⚡</div><div style="flex:1"><div class="sname">Aliance <span style="font-size:9px;color:#00d97e;font-weight:700;background:rgba(0,217,126,.12);padding:1px 6px;border-radius:6px;vertical-align:middle">v74 proposta-itens</span></div><div class="ssub">Gerencie clientes. Feche mais negócios.</div></div><button id="btn-som" onclick="toggleSom()" title="Ligar/desligar sons" style="background:rgba(255,255,255,.08);border:none;color:#fff;font-size:16px;width:34px;height:34px;border-radius:9px;cursor:pointer;flex-shrink:0">🔊</button></div>
+  <div class="slogo"><div class="smark">⚡</div><div style="flex:1"><div class="sname">Aliance <span style="font-size:9px;color:#00d97e;font-weight:700;background:rgba(0,217,126,.12);padding:1px 6px;border-radius:6px;vertical-align:middle">v84 proposta-itens</span></div><div class="ssub">Gerencie clientes. Feche mais negócios.</div></div><button id="btn-som" onclick="toggleSom()" title="Ligar/desligar sons" style="background:rgba(255,255,255,.08);border:none;color:#fff;font-size:16px;width:34px;height:34px;border-radius:9px;cursor:pointer;flex-shrink:0">🔊</button></div>
   <button id="btn-instalar-app" onclick="instalarApp()" style="display:flex;align-items:center;justify-content:center;gap:7px;width:calc(100% - 24px);margin:0 12px 8px;padding:9px;background:linear-gradient(135deg,var(--red),#b3161d);border:none;border-radius:10px;color:#fff;font-size:12px;font-weight:800;cursor:pointer;font-family:var(--F)">📲 Instalar como App</button>
   <nav id="NAV">
 
@@ -743,9 +743,24 @@ body.naoadmin .adm:not(.nav-group){display:none;}
       📄 Gerar PDF
     </button>
   </div>
+
+  <!-- DRE — Demonstração do Resultado (período personalizável) -->
+  <div class="card">
+    <div class="ch"><span class="ct">📑 DRE — Receitas x Despesas</span></div>
+    <div class="cb">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px">
+        <div class="fg" style="flex:1;min-width:130px;margin-bottom:0"><label>De</label><input class="fc" type="date" id="dre-ini"></div>
+        <div class="fg" style="flex:1;min-width:130px;margin-bottom:0"><label>Até</label><input class="fc" type="date" id="dre-fim"></div>
+        <button class="btn bg sm" onclick="gerarDRE()" style="height:38px;white-space:nowrap">📊 Gerar DRE</button>
+      </div>
+      <div id="dre-result"></div>
+    </div>
+  </div>
+
   <div class="g2">
     <div class="card"><div class="ch"><span class="ct">Receita por Contrato</span></div><div class="cb"><div style="height:178px"><canvas id="ch-ano"></canvas></div></div></div>
     <div class="card"><div class="ch"><span class="ct">Funil de Conversão</span></div><div class="cb" id="funil"></div></div>
+
   </div>
   <div class="g2">
     <div class="card"><div class="ch"><span class="ct">Serviços no Funil</span></div><div class="cb"><div style="height:178px"><canvas id="ch-pie"></canvas></div></div></div>
@@ -1806,6 +1821,54 @@ function calcReceita(){
   };
 }
 
+// ── DRE por período personalizável ──────────────────────
+// Usa a data real (ISO) de cada lançamento. Lançamentos antigos sem
+// data ficam de fora do período (entram no total geral, mas não no DRE).
+function calcDRE(dataIniStr, dataFimStr){
+  const ini = dataIniStr ? new Date(dataIniStr+'T00:00:00') : null;
+  const fim = dataFimStr ? new Date(dataFimStr+'T23:59:59') : null;
+  const noPeriodo = m=>{
+    if(!m.data) return false;
+    const d=new Date(m.data);
+    if(ini && d<ini) return false;
+    if(fim && d>fim) return false;
+    return true;
+  };
+  const entradasMov = DB.movs.filter(m=>m.tipo==='in' && noPeriodo(m));
+  const saidasMov   = DB.movs.filter(m=>m.tipo==='out' && noPeriodo(m));
+  const estornosMov = DB.movs.filter(m=>m.tipo==='estorno' && noPeriodo(m));
+
+  const receitaVendas = entradasMov.reduce((a,m)=>a+parseR(m.val),0);
+  const estornos = estornosMov.reduce((a,m)=>a+parseR(m.val),0);
+  const despesas = saidasMov.reduce((a,m)=>a+parseR(m.val),0);
+
+  // Receita recorrente (contratos ativos) — estimada: MRR atual × nº de meses no período
+  let mesesNoPeriodo=1;
+  if(ini && fim){
+    mesesNoPeriodo = Math.max(1, Math.round((fim-ini)/(1000*60*60*24*30.44)));
+  }
+  const contratosAtivos=DB.contratos.filter(c=>c.s==='at');
+  const mrr=contratosAtivos.reduce((a,c)=>a+parseR(c.val),0);
+  const receitaRecorrente = mrr*mesesNoPeriodo;
+
+  const receitaTotal = receitaVendas + receitaRecorrente - estornos;
+  const resultado = receitaTotal - despesas;
+
+  // Despesas por categoria (só do período)
+  const cats={};
+  saidasMov.forEach(m=>{ const c=(m.cat&&m.cat.trim())||'Outros'; cats[c]=(cats[c]||0)+parseR(m.val); });
+
+  // Sem data (fora de qualquer período — aviso pro usuário)
+  const semData = DB.movs.filter(m=>!m.data && m.tipo!=='estorno').length;
+
+  return {
+    receitaVendas, receitaRecorrente, estornos, receitaTotal,
+    despesas, despesasPorCategoria:cats, resultado,
+    mesesNoPeriodo, semData,
+    nLancamentos: entradasMov.length+saidasMov.length
+  };
+}
+
 function rDashContratosTipo(){
   const el=$('dash-contratos-tipo'); if(!el) return;
   const ativos=DB.contratos.filter(c=>c.s==='at');
@@ -2097,7 +2160,8 @@ function advDeal(id,dir){
           id:uid(), tipo:'in',
           val:String(valNum),
           desc:`🏆 Venda — ${d.emp}`,
-          ref:`Pipeline · ${TAGL[d.tag]||d.tag} · ${nowStr()}`
+          ref:`Pipeline · ${TAGL[d.tag]||d.tag} · ${nowStr()}`,
+          data:new Date().toISOString(), dataBR:new Date().toLocaleDateString('pt-BR')
         });
         rFinanceiro();
         ['ch-rec','ch-fin','ch-ano'].forEach(k=>{if(charts[k]){charts[k].destroy();delete charts[k];}});
@@ -3690,6 +3754,46 @@ function rItensComprados(){
     </div>`).join('');
 }
 
+function gerarDRE(){
+  const ini=$('dre-ini').value, fim=$('dre-fim').value;
+  const el=$('dre-result');
+  if(!ini||!fim){ el.innerHTML=`<div style="color:var(--red);font-size:12px;padding:8px 0">Selecione as duas datas (De / Até).</div>`; return; }
+  if(new Date(ini)>new Date(fim)){ el.innerHTML=`<div style="color:var(--red);font-size:12px;padding:8px 0">A data "De" não pode ser depois da data "Até".</div>`; return; }
+  const r=calcDRE(ini,fim);
+  const cor=r.resultado>=0?'var(--green)':'var(--red)';
+  const cats=Object.entries(r.despesasPorCategoria).sort((a,b)=>b[1]-a[1]);
+  el.innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px">
+      <div style="background:var(--s2);border-radius:10px;padding:10px 12px">
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">Receita Total</div>
+        <div style="font-size:17px;font-weight:900;color:var(--green);font-family:var(--M)">${fmtR(r.receitaTotal)}</div>
+      </div>
+      <div style="background:var(--s2);border-radius:10px;padding:10px 12px">
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">Despesas</div>
+        <div style="font-size:17px;font-weight:900;color:var(--red);font-family:var(--M)">${fmtR(r.despesas)}</div>
+      </div>
+      <div style="background:var(--s2);border-radius:10px;padding:10px 12px">
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">Resultado</div>
+        <div style="font-size:17px;font-weight:900;color:${cor};font-family:var(--M)">${fmtR(r.resultado)}</div>
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--t2);border-top:1px solid var(--bd);padding-top:10px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Receita de vendas/pagamentos (período)</span><span style="font-weight:700">${fmtR(r.receitaVendas)}</span></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Receita recorrente estimada (${r.mesesNoPeriodo} mês${r.mesesNoPeriodo>1?'es':''} × contratos ativos hoje)</span><span style="font-weight:700">${fmtR(r.receitaRecorrente)}</span></div>
+      ${r.estornos>0?`<div style="display:flex;justify-content:space-between;margin-bottom:4px;color:var(--red)"><span>(–) Estornos</span><span style="font-weight:700">-${fmtR(r.estornos)}</span></div>`:''}
+    </div>
+    ${cats.length?`<div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Despesas por categoria (período)</div>
+    ${cats.map(([cat,val])=>{
+      const pct=r.despesas>0?(val/r.despesas*100):0;
+      return `<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">
+        <span style="color:var(--t2)">${cat}</span>
+        <span style="color:var(--t1);font-weight:700">${fmtR(val)} <span style="color:var(--t3);font-size:10px">(${pct.toFixed(0)}%)</span></span>
+      </div>`;
+    }).join('')}`:`<div style="font-size:12px;color:var(--t3)">Sem despesas lançadas nesse período.</div>`}
+    ${r.semData>0?`<div style="margin-top:12px;font-size:11px;color:var(--orange);background:rgba(255,140,66,.1);padding:8px 10px;border-radius:8px">⚠️ Existem ${r.semData} lançamento${r.semData>1?'s':''} antigo${r.semData>1?'s':''} sem data registrada — não entram nesse período, mas continuam contando no financeiro geral.</div>`:''}
+  `;
+}
+
 function rDespesasCategoria(){
   const el=$('fin-cat'); if(!el) return;
   const outs=DB.movs.filter(m=>m.tipo==='out');
@@ -4463,7 +4567,7 @@ function marcarPago(id){
   const c=DB.cobrancas?.find(x=>x.id===id); if(!c) return;
   c.pago=true; c.pagoEm=new Date().toLocaleDateString('pt-BR');
   // Lança no financeiro
-  DB.movs.unshift({id:uid(),tipo:'in',val:String(c.valor),desc:`💸 Pagamento — ${c.cliente}`,ref:`${c.descricao} · ${c.pagoEm}`});
+  DB.movs.unshift({id:uid(),tipo:'in',val:String(c.valor),desc:`💸 Pagamento — ${c.cliente}`,ref:`${c.descricao} · ${c.pagoEm}`,data:new Date().toISOString(),dataBR:c.pagoEm||new Date().toLocaleDateString('pt-BR')});
   DB.notifs.unshift({ic:'✅',t:`Pago: ${c.cliente}`,sub:`${fmtR(c.valor)} recebido em ${c.pagoEm}`,time:nowStr(),tipo:'unread'});
   adicionarEvento(c.cliente,'fin',`Pagamento recebido: ${fmtR(c.valor)}`,'✅');
   rCobrancas();rFinanceiro();rNotifs();updKPI();autoSave();
@@ -4564,7 +4668,7 @@ function confirmarPagamentoMisto(){
   // Lança cada forma separada no financeiro
   linhas.forEach(l=>{
     const v=parseFloat(l.val)||0;
-    DB.movs.unshift({id:uid(),tipo:'in',val:String(v),desc:`💸 Pagamento (${l.forma}) — ${c.cliente}`,ref:`${c.descricao} · ${hojeStr}`});
+    DB.movs.unshift({id:uid(),tipo:'in',val:String(v),desc:`💸 Pagamento (${l.forma}) — ${c.cliente}`,ref:`${c.descricao} · ${hojeStr}`,data:new Date().toISOString(),dataBR:hojeStr});
   });
   // Salva o detalhamento na cobrança
   c.pagamentos=(c.pagamentos||[]).concat(linhas.map(l=>({forma:l.forma,val:parseFloat(l.val)||0,data:hojeStr})));
@@ -4649,7 +4753,7 @@ function confirmarPagamentoParcial(id){
   const rest=devido-pago;
 
   // Lança SEMPRE o valor real recebido no financeiro (valores corretos)
-  DB.movs.unshift({id:uid(),tipo:'in',val:String(pago),desc:`💸 Pagamento — ${c.cliente}`,ref:`${c.descricao} · ${hojeStr}${rest>0.005?' (parcial)':(rest<-0.005?' (com crédito)':'')}`});
+  DB.movs.unshift({id:uid(),tipo:'in',val:String(pago),desc:`💸 Pagamento — ${c.cliente}`,ref:`${c.descricao} · ${hojeStr}${rest>0.005?' (parcial)':(rest<-0.005?' (com crédito)':'')}`,data:new Date().toISOString(),dataBR:hojeStr});
 
   if(Math.abs(rest)<0.005){
     // Pagou o valor exato — quita
@@ -7932,7 +8036,8 @@ function aprovarProposta(i){
     id:uid(), tipo:'in',
     val:String(totalFinal),
     desc:`✅ Proposta aprovada — ${p.cliente}: ${p.titulo}`,
-    ref:`Proposta aprovada em ${new Date().toLocaleDateString('pt-BR')}`
+    ref:`Proposta aprovada em ${new Date().toLocaleDateString('pt-BR')}`,
+    data:new Date().toISOString(), dataBR:new Date().toLocaleDateString('pt-BR')
   });
 
   // 3. Registra histórico e feed
