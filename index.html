@@ -668,7 +668,12 @@ body.naoadmin .adm:not(.nav-group){display:none;}
   </div>
   <div class="g2">
     <div class="card"><div class="ch"><span class="ct">Distribuição por Contrato</span><span class="pill pg2">Real</span></div><div class="cb"><div style="height:168px"><canvas id="ch-fin"></canvas></div></div></div>
-    <div class="card"><div class="ch"><span class="ct">Lançamentos Financeiros</span><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm" style="background:rgba(0,217,126,.14);color:var(--green);font-weight:800" onclick="abrirNovaVenda()">💰 Nova Venda</button><button class="btn sm" style="background:rgba(255,140,66,.14);color:var(--orange);font-weight:800" onclick="abrirNovaSaida()">🛒 Nova Compra</button><button class="btn bg sm" onclick="M.open('mov')">+ Lançar</button></div></div><div class="cb" id="fin-movs"></div></div>
+    <div class="card"><div class="ch"><span class="ct">Lançamentos Financeiros</span><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm" style="background:rgba(0,217,126,.14);color:var(--green);font-weight:800" onclick="abrirNovaVenda()">💰 Nova Venda</button><button class="btn sm" style="background:rgba(255,140,66,.14);color:var(--orange);font-weight:800" onclick="abrirNovaSaida()">🛒 Nova Compra</button><button class="btn bg sm" onclick="M.open('mov')">+ Lançar</button></div></div>
+      <div style="padding:10px 16px 0;display:flex;gap:6px" id="fin-view-toggle">
+        <button class="btn sm" id="fin-btn-mes" onclick="setFinView('mes')" style="font-weight:800"></button>
+        <button class="btn sm br" id="fin-btn-tudo" onclick="setFinView('tudo')" style="font-weight:800">📜 Ver tudo</button>
+      </div>
+    <div class="cb" id="fin-movs"></div></div>
   </div>
   <div class="card" style="margin-top:4px"><div class="ch"><span class="ct">💰 Vendas Registradas</span><span class="pill" style="background:rgba(0,217,126,.15);color:var(--green)" id="fin-vendas-count">0</span></div><div class="cb" id="fin-vendas"></div></div>
   <div class="card" style="margin-top:4px"><div class="ch"><span class="ct">📦 Itens Mais Comprados</span><span class="pill pr">Histórico</span></div><div class="cb" id="fin-itens-rank"></div></div>
@@ -3880,21 +3885,58 @@ function rDespesasCategoria(){
     }).join('')}`;
 }
 
+// ── Visão do Fluxo de Caixa: mês atual (padrão) ou tudo ──
+let _finViewMode='mes'; // 'mes' | 'tudo'
+function setFinView(modo){ _finViewMode=modo; rFinanceiro(); }
+
+// Mesma lógica de calcReceita, mas filtrando os movs por um intervalo
+// de datas. Usado pra "zerar" a visão de Fluxo de Caixa todo mês.
+function calcReceitaPeriodo(dataIniStr, dataFimStr){
+  const ini=dataIniStr?new Date(dataIniStr+'T00:00:00'):null;
+  const fim=dataFimStr?new Date(dataFimStr+'T23:59:59'):null;
+  const noPeriodo=m=>{ if(!m.data) return false; const d=new Date(m.data); if(ini&&d<ini) return false; if(fim&&d>fim) return false; return true; };
+  const movsPeriodo=DB.movs.filter(noPeriodo);
+  const entradas=movsPeriodo.filter(m=>m.tipo==='in').reduce((a,m)=>a+parseR(m.val),0);
+  const saidas=movsPeriodo.filter(m=>m.tipo==='out').reduce((a,m)=>a+parseR(m.val),0);
+  const estornos=movsPeriodo.filter(m=>m.tipo==='estorno').reduce((a,m)=>a+parseR(m.val),0);
+  const saldo=entradas-estornos-saidas;
+  const contratosAtivos=DB.contratos.filter(c=>c.s==='at');
+  const recContratos=contratosAtivos.reduce((a,c)=>a+parseR(c.val),0);
+  const recTotal=Math.max(0, recContratos+saldo);
+  return { entradas, saidas, estornos, saldo, recContratos, recTotal, nContratos:contratosAtivos.length, movsPeriodo };
+}
+
 function rFinanceiro(){
   const m=$('fin-movs'); if(!m) return;
   rDespesasCategoria();
   if(typeof rVendas==='function') rVendas();
   if(typeof rItensComprados==='function') rItensComprados();
 
-  // Atualiza KPIs do financeiro usando calcReceita centralizado
-  const r=calcReceita();
+  const hoje=new Date();
+  const mesLabel=hoje.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+  const primDia=new Date(hoje.getFullYear(),hoje.getMonth(),1).toISOString().slice(0,10);
+  const ultDia=new Date(hoje.getFullYear(),hoje.getMonth()+1,0).toISOString().slice(0,10);
+
+  const btnMes=$('fin-btn-mes'), btnTudo=$('fin-btn-tudo');
+  if(btnMes) btnMes.innerHTML=`📅 ${mesLabel.charAt(0).toUpperCase()+mesLabel.slice(1)}`;
+  if(btnMes && btnTudo){
+    if(_finViewMode==='mes'){ btnMes.className='btn sm bg'; btnTudo.className='btn sm br'; }
+    else { btnMes.className='btn sm br'; btnTudo.className='btn sm bg'; }
+  }
+
+  const usaPeriodo=_finViewMode==='mes';
+  const r=usaPeriodo?calcReceitaPeriodo(primDia,ultDia):calcReceita();
+  const movsExibir=usaPeriodo?r.movsPeriodo:DB.movs;
+
   set('fin-r', fmtR(r.recTotal));
   set('fin-c', r.nContratos);
   set('fin-d', fmtR(r.saidas));   // só despesas reais
   set('fin-s', fmtR(r.saldo));
   set('fin-sd', r.saldo>=0?'↑ positivo':'↓ negativo');
 
-  m.innerHTML=DB.movs.length?DB.movs.map((mv,i)=>{
+  const avisoSemData=usaPeriodo?(DB.movs.filter(mv=>!mv.data && mv.tipo!=='estorno').length):0;
+
+  m.innerHTML=(movsExibir.length?movsExibir.map((mv,i)=>{
     const isEstorno=mv.tipo==='estorno';
     const isIn=mv.tipo==='in';
     const isOut=mv.tipo==='out';
@@ -3937,7 +3979,7 @@ function rFinanceiro(){
         <div style="font-size:20px;font-weight:900;color:${r.recTotal>=0?'var(--green)':'var(--red)'}">${fmtR(r.recTotal)}</div>
       </div>
     </div>
-  `:empty('💰','Sem lancamentos','Adicione entradas e saidas');
+  `:empty('💰','Sem lançamentos neste período','Adicione entradas e saidas')) + (avisoSemData>0?`<div style="margin-top:10px;font-size:11px;color:var(--orange);background:rgba(255,140,66,.1);padding:8px 10px;border-radius:8px">⚠️ Existem ${avisoSemData} lançamento${avisoSemData>1?'s':''} antigo${avisoSemData>1?'s':''} sem data — não aparecem na visão "Este mês". Clique em "📜 Ver tudo" pra vê-los.</div>`:'');
 }
 function delMov(id){
   const mv=(DB.movs||[]).find(x=>String(x.id)===String(id));
