@@ -2031,7 +2031,7 @@ function updKPI(){
   set('m-cli', DB.empresas.filter(e=>e.s==='at').length);
 
   // Financeiro KPIs
-  set('fin-r', fmtR(r.recTotal));
+  set('fin-r', fmtR(r.recContratos));
   set('fin-c', r.nContratos);
   set('fin-d', fmtR(r.saidas));
   set('fin-d-sub', r.estornos>0?`🚫 ${fmtR(r.estornos)} em estornos`:'sem estornos');
@@ -3902,7 +3902,7 @@ function calcReceitaPeriodo(dataIniStr, dataFimStr){
   const saldo=entradas-estornos-saidas;
   const contratosAtivos=DB.contratos.filter(c=>c.s==='at');
   const recContratos=contratosAtivos.reduce((a,c)=>a+parseR(c.val),0);
-  const recTotal=Math.max(0, recContratos+saldo);
+  const recTotal=recContratos+saldo;
   return { entradas, saidas, estornos, saldo, recContratos, recTotal, nContratos:contratosAtivos.length, movsPeriodo };
 }
 
@@ -3928,7 +3928,7 @@ function rFinanceiro(){
   const r=usaPeriodo?calcReceitaPeriodo(primDia,ultDia):calcReceita();
   const movsExibir=usaPeriodo?r.movsPeriodo:DB.movs;
 
-  set('fin-r', fmtR(r.recTotal));
+  set('fin-r', fmtR(r.recContratos));
   set('fin-c', r.nContratos);
   set('fin-d', fmtR(r.saidas));   // só despesas reais
   set('fin-s', fmtR(r.saldo));
