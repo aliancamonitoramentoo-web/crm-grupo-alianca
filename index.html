@@ -666,6 +666,10 @@ body.naoadmin .adm:not(.nav-group){display:none;}
     <div class="kpi kg"><div class="kl">Saldo Estimado</div><div class="kv" id="fin-s">R$ 0</div><div class="kd" id="fin-sd">—</div></div>
     <div class="kpi kb"><div class="kl">Contratos Ativos</div><div class="kv" id="fin-c">0</div><div class="kd">—</div></div>
   </div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="ch"><span class="ct">🔒 Despesas Fixas (contam sozinhas todo mês)</span><button class="btn sm" style="background:rgba(255,69,96,.14);color:var(--red);font-weight:800" onclick="abrirDespesaFixa()">+ Despesa Fixa</button></div>
+    <div class="cb" id="desp-fixas-list"></div>
+  </div>
   <div class="g2">
     <div class="card"><div class="ch"><span class="ct">Distribuição por Contrato</span><span class="pill pg2">Real</span></div><div class="cb"><div style="height:168px"><canvas id="ch-fin"></canvas></div></div></div>
     <div class="card"><div class="ch"><span class="ct">Lançamentos Financeiros</span><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm" style="background:rgba(0,217,126,.14);color:var(--green);font-weight:800" onclick="abrirNovaVenda()">💰 Nova Venda</button><button class="btn sm" style="background:rgba(255,140,66,.14);color:var(--orange);font-weight:800" onclick="abrirNovaSaida()">🛒 Nova Compra</button><button class="btn bg sm" onclick="M.open('mov')">+ Lançar</button></div></div>
@@ -747,6 +751,12 @@ body.naoadmin .adm:not(.nav-group){display:none;}
     <button class="btn bg" onclick="gerarRelatorioDiario()" style="padding:10px 20px;font-size:13px;font-weight:700;background:#1565C0;border-color:#1565C0;white-space:nowrap">
       📄 Gerar PDF
     </button>
+  </div>
+
+  <!-- Resumo Mensal — últimos meses, sem precisar digitar datas -->
+  <div class="card">
+    <div class="ch"><span class="ct">📅 Quanto cada mês gerou</span></div>
+    <div class="cb" id="resumo-mensal-list"></div>
   </div>
 
   <!-- DRE — Demonstração do Resultado (período personalizável) -->
@@ -1778,6 +1788,7 @@ function go(id,el){
   if(id==='os')       setTimeout(()=>{ rOS(); rTecnicos(); },100);
   
   if(id==='equipe')   setTimeout(rEquipe,100);
+  if(id==='relatorios') setTimeout(renderResumoMensal,100);
   if(id==='config')   setTimeout(()=>{ atualizarStatusGDrive(); atualizarBackupStats(); atualizarStatusConexao(); atualizarStatusJB(); setTimeout(atualizarStatusKey,200); },100);
   setTimeout(initCharts,120);
 }
@@ -1853,7 +1864,6 @@ function calcDRE(dataIniStr, dataFimStr){
 
   const receitaVendas = entradasMov.reduce((a,m)=>a+parseR(m.val),0);
   const estornos = estornosMov.reduce((a,m)=>a+parseR(m.val),0);
-  const despesas = saidasMov.reduce((a,m)=>a+parseR(m.val),0);
 
   // Receita recorrente: soma o MRR REAL de cada mês do período usando os
   // snapshots salvos (DB.mrrSnapshots). Meses sem snapshot (período antes
@@ -1877,15 +1887,40 @@ function calcDRE(dataIniStr, dataFimStr){
   }
 
   const receitaTotal = receitaVendas + receitaRecorrente - estornos;
+
+  // Despesas fixas recorrentes (cadastro em 🔒 Despesa Fixa) — soma o valor
+  // REAL de cada mês via snapshot (DB.despFixasSnapshots), igual à receita
+  // recorrente. Meses sem snapshot usam o total atual como estimativa.
+  const despFixasAtivasHoje=(DB.despesasFixas||[]).filter(d=>d.ativo!==false);
+  const totalFixasHoje=despFixasAtivasHoje.reduce((a,d)=>a+parseR(d.val),0);
+  let despesasFixasRecorrentes=0, mesesReaisDesp=0, mesesEstimadosDesp=0;
+  if(ini && fim){
+    const mesesD=[];
+    let cursorD=new Date(ini.getFullYear(),ini.getMonth(),1);
+    const limiteD=new Date(fim.getFullYear(),fim.getMonth(),1);
+    while(cursorD<=limiteD){ mesesD.push(cursorD.getFullYear()+'-'+String(cursorD.getMonth()+1).padStart(2,'0')); cursorD=new Date(cursorD.getFullYear(),cursorD.getMonth()+1,1); }
+    mesesD.forEach(mesKey=>{
+      const snap=(DB.despFixasSnapshots||[]).find(s=>s.mes===mesKey);
+      if(snap){ despesasFixasRecorrentes+=snap.valor; mesesReaisDesp++; }
+      else { despesasFixasRecorrentes+=totalFixasHoje; mesesEstimadosDesp++; }
+    });
+  } else { despesasFixasRecorrentes=totalFixasHoje; mesesEstimadosDesp=1; }
+
+  const despesas = saidasMov.reduce((a,m)=>a+parseR(m.val),0) + despesasFixasRecorrentes;
   const resultado = receitaTotal - despesas;
 
-  // Despesas por categoria (só do período)
+  // Despesas por categoria (só do período — inclui lançamentos avulsos)
   const cats={};
   saidasMov.forEach(m=>{ const c=(m.cat&&m.cat.trim())||'Outros'; cats[c]=(cats[c]||0)+parseR(m.val); });
 
   // Despesas fixas x variáveis
-  let despesasFixas=0, despesasVariaveis=0;
+  let despesasFixas=despesasFixasRecorrentes, despesasVariaveis=0;
   const catsFixas={}, catsVariaveis={};
+  // Categorias das despesas fixas recorrentes (aproximação: lista atual × meses do período)
+  despFixasAtivasHoje.forEach(d=>{
+    const c=(d.cat&&d.cat.trim())||'Outros', v=parseR(d.val)*mesesNoPeriodo;
+    catsFixas[c]=(catsFixas[c]||0)+v;
+  });
   saidasMov.forEach(m=>{
     const c=(m.cat&&m.cat.trim())||'Outros', v=parseR(m.val);
     if(isCatFixa(c)){ despesasFixas+=v; catsFixas[c]=(catsFixas[c]||0)+v; }
@@ -1900,9 +1935,29 @@ function calcDRE(dataIniStr, dataFimStr){
     despesas, despesasPorCategoria:cats, resultado,
     despesasFixas, despesasVariaveis, catsFixas, catsVariaveis,
     mesesNoPeriodo, semData,
-    mesesReais, mesesEstimados,
+    mesesReais, mesesEstimados, mesesReaisDesp, mesesEstimadosDesp, despesasFixasRecorrentes,
     nLancamentos: entradasMov.length+saidasMov.length
   };
+}
+
+// ── Resumo dos últimos N meses (histórico automático, sem digitar data) ──
+function calcResumoMensal(nMeses){
+  nMeses=nMeses||6;
+  const hoje=new Date();
+  const meses=[];
+  for(let i=nMeses-1;i>=0;i--){
+    const d=new Date(hoje.getFullYear(),hoje.getMonth()-i,1);
+    const primDia=d.toISOString().slice(0,10);
+    const ultDia=new Date(d.getFullYear(),d.getMonth()+1,0).toISOString().slice(0,10);
+    const r=calcDRE(primDia,ultDia);
+    meses.push({
+      mesKey:d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'),
+      label:d.toLocaleDateString('pt-BR',{month:'short',year:'numeric'}),
+      receitaTotal:r.receitaTotal, despesas:r.despesas, resultado:r.resultado,
+      ehMesAtual: d.getFullYear()===hoje.getFullYear() && d.getMonth()===hoje.getMonth()
+    });
+  }
+  return meses;
 }
 
 function rDashContratosTipo(){
@@ -3702,6 +3757,73 @@ function excluirVenda(id){
 // ═══════════════════════════════════════════════════
 //  🛒 NOVA COMPRA / SAÍDA COM ITENS (nota de compra)
 // ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
+//  🔒 DESPESAS FIXAS RECORRENTES (contam sozinhas todo mês)
+// ═══════════════════════════════════════════════════
+function abrirDespesaFixa(){
+  $('mod-title').innerHTML='🔒 Nova Despesa Fixa';
+  $('mod-body').innerHTML=`
+    <div class="fg"><label>Descrição</label><input class="fc" id="df-desc" placeholder="Ex: Aluguel do galpão, Salário João"></div>
+    <div class="fg2">
+      <div class="fg"><label>Categoria</label><input class="fc" id="df-cat" list="sd-cat-list" placeholder="Ex: Aluguel"></div>
+      <div class="fg"><label>Valor mensal (R$)</label><input class="fc" id="df-val" type="number" step="0.01" placeholder="0,00"></div>
+    </div>
+    <div style="font-size:11px;color:var(--t3);background:var(--s2);padding:8px 10px;border-radius:8px;margin-bottom:12px">💡 Depois de cadastrada, essa despesa entra sozinha todo mês — sem precisar lançar de novo. Pra parar de contar, é só remover da lista.</div>
+    <button onclick="confirmarDespesaFixa()" style="width:100%;padding:12px;background:var(--red);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--F)">Cadastrar Despesa Fixa</button>`;
+  const b=$('mod-save-btn'); if(b)b.style.display='none';
+  $('MOD').classList.add('open');
+}
+function confirmarDespesaFixa(){
+  const desc=($('df-desc').value||'').trim();
+  const cat=($('df-cat').value||'Outros').trim()||'Outros';
+  const val=parseR($('df-val').value);
+  if(!desc){ toast('⚠️ Digite uma descrição'); return; }
+  if(!val || val<=0){ toast('⚠️ Digite um valor válido'); return; }
+  DB.despesasFixas=DB.despesasFixas||[];
+  DB.despesasFixas.push({id:uid(), desc, cat, val:String(val), ativo:true, criadoEm:new Date().toISOString()});
+  snapshotDespesasFixas();
+  DB._ts=Date.now(); salvarLocal(); jbEnviar(false);
+  $('MOD').classList.remove('open');
+  rFinanceiro(); updKPI();
+  toast(`🔒 Despesa fixa "${desc}" cadastrada — ${fmtR(val)}/mês`);
+}
+function removerDespesaFixa(id){
+  const d=(DB.despesasFixas||[]).find(x=>String(x.id)===String(id)); if(!d) return;
+  if(!confirm(`Remover a despesa fixa "${d.desc}" (${fmtR(parseR(d.val))}/mês)?\n\nEla vai parar de contar a partir de agora. Meses anteriores já registrados não mudam.`)) return;
+  DB.despesasFixas=(DB.despesasFixas||[]).filter(x=>String(x.id)!==String(id));
+  snapshotDespesasFixas();
+  DB._ts=Date.now(); salvarLocal(); jbEnviar(false);
+  rFinanceiro(); updKPI();
+  toast(`🗑️ Despesa fixa "${d.desc}" removida`);
+}
+function renderDespesasFixasList(){
+  const el=$('desp-fixas-list'); if(!el) return;
+  const lista=(DB.despesasFixas||[]).filter(d=>d.ativo!==false);
+  if(!lista.length){ el.innerHTML=`<div style="font-size:11px;color:var(--t3);padding:6px 0">Nenhuma despesa fixa cadastrada ainda.</div>`; return; }
+  const total=lista.reduce((a,d)=>a+parseR(d.val),0);
+  el.innerHTML=`<div style="display:flex;flex-direction:column;gap:6px">${lista.map(d=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;background:var(--s2);border-radius:8px;padding:7px 10px">
+      <div><span style="font-size:12px;font-weight:700">${d.desc}</span><span style="font-size:10px;color:var(--t3);margin-left:6px">${d.cat}</span></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:12px;font-weight:800;color:var(--red)">${fmtR(d.val)}/mês</span>
+        <button onclick="removerDespesaFixa('${d.id}')" title="Remover" style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:13px">🗑️</button>
+      </div>
+    </div>`).join('')}
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--t3);padding-top:4px;border-top:1px solid var(--bd)"><span>Total fixo/mês</span><span style="font-weight:800;color:var(--red)">${fmtR(total)}</span></div>
+  </div>`;
+}
+// Snapshot mensal do total de despesas fixas (mesmo padrão do snapshotMRR)
+function snapshotDespesasFixas(){
+  DB.despFixasSnapshots=DB.despFixasSnapshots||[];
+  const hoje=new Date();
+  const mesKey=hoje.getFullYear()+'-'+String(hoje.getMonth()+1).padStart(2,'0');
+  const ativas=(DB.despesasFixas||[]).filter(d=>d.ativo!==false);
+  const total=ativas.reduce((a,d)=>a+parseR(d.val),0);
+  const existente=DB.despFixasSnapshots.find(s=>s.mes===mesKey);
+  if(existente){ existente.valor=total; existente.n=ativas.length; }
+  else { DB.despFixasSnapshots.push({mes:mesKey, valor:total, n:ativas.length}); if(typeof salvarLocal==='function') salvarLocal(); }
+}
+
 let _saidaItens=[];
 function abrirNovaSaida(){
   _saidaItens=[{nome:'',qtd:1,val:''}];
@@ -3788,6 +3910,23 @@ function rItensComprados(){
       <span style="font-size:12.5px;color:var(--t1);font-weight:600">${i+1}. ${it.nome}</span>
       <span style="font-size:11px;color:var(--t2)"><b style="color:var(--orange)">${it.qtd}un</b> · ${fmtR(it.val)}</span>
     </div>`).join('');
+}
+
+function renderResumoMensal(){
+  const el=$('resumo-mensal-list'); if(!el) return;
+  const meses=calcResumoMensal(6);
+  el.innerHTML=`<div style="display:flex;flex-direction:column;gap:6px">${meses.map(m=>{
+    const cor=m.resultado>=0?'var(--green)':'var(--red)';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;background:var(--s2);border-radius:9px;padding:9px 12px;${m.ehMesAtual?'border:1px solid var(--gold)':''}">
+      <div style="font-size:12px;font-weight:800;text-transform:capitalize">${m.label}${m.ehMesAtual?' <span style="font-size:9px;color:var(--gold);font-weight:700">· atual</span>':''}</div>
+      <div style="display:flex;gap:16px;align-items:center">
+        <div style="text-align:right"><div style="font-size:9px;color:var(--t3)">Receita</div><div style="font-size:12px;font-weight:700;color:var(--green)">${fmtR(m.receitaTotal)}</div></div>
+        <div style="text-align:right"><div style="font-size:9px;color:var(--t3)">Despesas</div><div style="font-size:12px;font-weight:700;color:var(--red)">${fmtR(m.despesas)}</div></div>
+        <div style="text-align:right;min-width:70px"><div style="font-size:9px;color:var(--t3)">Resultado</div><div style="font-size:13px;font-weight:900;color:${cor};font-family:var(--M)">${fmtR(m.resultado)}</div></div>
+      </div>
+    </div>`;
+  }).join('')}</div>
+  <div style="font-size:10px;color:var(--t3);margin-top:8px">Meses futuros/sem histórico ainda usam contratos e despesas fixas atuais como estimativa.</div>`;
 }
 
 function gerarDRE(){
@@ -3896,14 +4035,19 @@ function calcReceitaPeriodo(dataIniStr, dataFimStr){
   const fim=dataFimStr?new Date(dataFimStr+'T23:59:59'):null;
   const noPeriodo=m=>{ if(!m.data) return false; const d=new Date(m.data); if(ini&&d<ini) return false; if(fim&&d>fim) return false; return true; };
   const movsPeriodo=DB.movs.filter(noPeriodo);
-  const entradas=movsPeriodo.filter(m=>m.tipo==='in').reduce((a,m)=>a+parseR(m.val),0);
-  const saidas=movsPeriodo.filter(m=>m.tipo==='out').reduce((a,m)=>a+parseR(m.val),0);
+  const entradasAvulsas=movsPeriodo.filter(m=>m.tipo==='in').reduce((a,m)=>a+parseR(m.val),0);
+  const saidasAvulsas=movsPeriodo.filter(m=>m.tipo==='out').reduce((a,m)=>a+parseR(m.val),0);
   const estornos=movsPeriodo.filter(m=>m.tipo==='estorno').reduce((a,m)=>a+parseR(m.val),0);
+  // Despesas fixas cadastradas contam sozinhas neste período (mesmo sem lançamento manual)
+  const despFixasAtivas=(DB.despesasFixas||[]).filter(d=>d.ativo!==false);
+  const despesasFixasTotal=despFixasAtivas.reduce((a,d)=>a+parseR(d.val),0);
+  const entradas=entradasAvulsas;
+  const saidas=saidasAvulsas+despesasFixasTotal;
   const saldo=entradas-estornos-saidas;
   const contratosAtivos=DB.contratos.filter(c=>c.s==='at');
   const recContratos=contratosAtivos.reduce((a,c)=>a+parseR(c.val),0);
   const recTotal=recContratos+saldo;
-  return { entradas, saidas, estornos, saldo, recContratos, recTotal, nContratos:contratosAtivos.length, movsPeriodo };
+  return { entradas, saidas, estornos, saldo, recContratos, recTotal, nContratos:contratosAtivos.length, movsPeriodo, despesasFixasTotal };
 }
 
 function rFinanceiro(){
@@ -3911,6 +4055,7 @@ function rFinanceiro(){
   rDespesasCategoria();
   if(typeof rVendas==='function') rVendas();
   if(typeof rItensComprados==='function') rItensComprados();
+  renderDespesasFixasList();
 
   const hoje=new Date();
   const mesLabel=hoje.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
@@ -12830,6 +12975,8 @@ function initApp(){
   if(!DB.cobrancas)       DB.cobrancas=[];
   if(!DB.comprasClientes) DB.comprasClientes={};
   if(!DB.mrrSnapshots)    DB.mrrSnapshots=[];
+  if(!DB.despesasFixas)   DB.despesasFixas=[];
+  if(!DB.despFixasSnapshots) DB.despFixasSnapshots=[];
 
   // Migra estornos antigos que foram salvos como tipo:'out' com Estorno no desc
   let migrou=false;
@@ -12855,14 +13002,14 @@ function initApp(){
   // Carrega dados
   if(modoBackend){
     carregarTodosDados().then(()=>{
-      snapshotMRR();
+      snapshotMRR(); snapshotDespesasFixas();
       _reRenderAll(); rAdminPanel();
       setTimeout(initCharts,300);
       setInterval(async()=>{ if(modoBackend) await carregarTodosDados().then(()=>updAll()).catch(()=>{}); }, 30000);
     });
   } else {
     carregarLocal();
-    snapshotMRR();
+    snapshotMRR(); snapshotDespesasFixas();
     rTopCli();rPipeline();rClientes();rCentral();rOS();rTasks();
     rContratos();rAgenda();rEquipe();rFinanceiro();rCobrancas();rNotifs();
     rWA();rFunil();rResumo();rCfgNotifs();rTecnicos();rUsuarios();rMapa();
