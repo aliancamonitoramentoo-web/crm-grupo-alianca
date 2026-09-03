@@ -2058,14 +2058,22 @@ function updKPI(){
   set('k-recd', `${r.nContratos} contrato${r.nContratos!==1?'s':''} ativos`);
   set('k-con', r.nContratos);
 
-  // Receita de vendas: deals fechados (Pipeline) + vendas registradas (Registrar Venda)
-  // Exclui deals que já foram registrados como venda (senão conta em dobro)
-  const recDealsF=r.dealsFechados.filter(d=>!d.registradoVenda).reduce((a,d)=>a+parseR(d.val),0);
-  const recVendasReg=(DB.vendas||[]).reduce((a,v)=>a+parseR(v.total),0);
-  const recVendas=recDealsF+recVendasReg;
-  const nVendasTotal=r.dealsFechados.filter(d=>!d.registradoVenda).length+(DB.vendas||[]).length;
+  // Receita de vendas do MÊS ATUAL — usa o timestamp real de cada venda
+  // registrada (DB.vendas). Deals fechados só no Pipeline (sem "Registrar
+  // Venda") não têm data confiável, então não entram nesse total mensal —
+  // aparecem à parte, avisando pra registrar formalmente.
+  const hoje2=new Date();
+  const vendasMes=(DB.vendas||[]).filter(v=>{
+    if(!v.ts) return false;
+    const d=new Date(v.ts);
+    return d.getFullYear()===hoje2.getFullYear() && d.getMonth()===hoje2.getMonth();
+  });
+  const recVendas=vendasMes.reduce((a,v)=>a+parseR(v.total),0);
+  const lucroVendasMes=vendasMes.reduce((a,v)=>a+(parseFloat(v.lucro)||0),0);
+  const dealsSemData=r.dealsFechados.filter(d=>!d.registradoVenda).length;
+  const nVendasTotal=vendasMes.length;
   set('k-vendas', fmtR(recVendas));
-  set('k-vendas-d', `${nVendasTotal} venda${nVendasTotal!==1?'s':''}`);
+  set('k-vendas-d', `${nVendasTotal} venda${nVendasTotal!==1?'s':''} este mês${dealsSemData>0?` (+${dealsSemData} no Pipeline sem data)`:''}`);
 
   set('k-lea', leads);
   set('k-os2', osAb);
@@ -2108,10 +2116,9 @@ function updKPI(){
   updReconquistaAlert();
   if(typeof updRecKPIs==='function') updRecKPIs();
   updRecDashAlert();
-  // Lucro em vendas
-  if(typeof calcLucroVendas==='function') set('k-lucro', fmtR(calcLucroVendas()));
-  const nv=(DB.vendas||[]).length;
-  set('k-lucrod', nv?`de ${nv} venda${nv>1?'s':''}`:'equipamento + mão de obra');
+  // Lucro em vendas (só do mês atual, mesma base do card de Receita de Vendas acima)
+  set('k-lucro', fmtR(lucroVendasMes));
+  set('k-lucrod', nVendasTotal?`de ${nVendasTotal} venda${nVendasTotal>1?'s':''} este mês`:'sem vendas este mês ainda');
   updBoletoAlert();
 }
 
