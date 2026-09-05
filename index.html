@@ -6072,7 +6072,7 @@ const M={
       const ini=new Date().toLocaleDateString('pt-BR',{month:'short',year:'numeric'});
       const venc=vencRaw?new Date(vencRaw+'T00:00').toLocaleDateString('pt-BR',{month:'short',year:'numeric'}):'—';
       const cid='GA-'+(String(DB.contratos.length+1).padStart(3,'0'));
-      DB.contratos.push({id:uid(),cid,cli,srv,val:String(val),ini,venc,s:'at'});
+      DB.contratos.push({id:uid(),cid,cli,srv,val:String(val),ini,venc,s:'at',ts:Date.now()});
       const e=DB.empresas.find(x=>x.nome===cli);if(e){e.s='at';e.val=val;}
       DB.notifs.unshift({ic:'📄',t:`Contrato: ${cli}`,sub:`${srv} — ${fmtR(val)}/mês`,time:nowStr(),tipo:'success'});
       addFeed('📄','rgba(0,217,126,.12)',`Contrato: ${cli} — ${fmtR(val)}/mês`);
@@ -6159,7 +6159,7 @@ const M={
         const iniC=new Date().toLocaleDateString('pt-BR',{month:'short',year:'numeric'});
         const vencC=new Date(ano+1, mes-1, 1).toLocaleDateString('pt-BR',{month:'short',year:'numeric'}); // renovação anual, ajustável depois
         const cidC='GA-'+(String(DB.contratos.length+1).padStart(3,'0'));
-        const contratoNovo={id:uid(),cid:cidC,cli,srv:serv,val:String(val),ini:iniC,venc:vencC,s:'at',recId:_recCriado.id};
+        const contratoNovo={id:uid(),cid:cidC,cli,srv:serv,val:String(val),ini:iniC,venc:vencC,s:'at',recId:_recCriado.id,ts:Date.now()};
         DB.contratos.push(contratoNovo);
         _recCriado.contratoId=contratoNovo.id;
         const e=DB.empresas.find(x=>x.nome===cli);if(e){e.s='at';e.val=val;}
@@ -10257,6 +10257,19 @@ function calcValorMeta(meta){
                             : recorrentes.filter(r=>(r.servico||'').toLowerCase().includes(filtro)).reduce((a,r)=>a+parseR(r.val),0);
     return recCont + recRec;
   }
+  if(meta.tipo==='contratos_novos_mes'){
+    // Soma só contratos criados NESTE mês (usa timestamp real; contratos
+    // antigos sem timestamp não entram — a meta zera sozinha todo mês)
+    const filtro=(meta.filtro||'').toLowerCase();
+    const hojeM=new Date();
+    const doMes=contratos.filter(c=>{
+      if(!c.ts) return false;
+      const d=new Date(c.ts);
+      if(d.getFullYear()!==hojeM.getFullYear()||d.getMonth()!==hojeM.getMonth()) return false;
+      return !filtro || (c.srv||'').toLowerCase().includes(filtro);
+    });
+    return doMes.reduce((a,c)=>a+parseR(c.val),0);
+  }
   if(meta.tipo==='os_feitas')  return DB.os.filter(o=>o.s==='at').length;
   if(meta.tipo==='vendas')     return DB.deals.filter(d=>d.stage===DB.stages.length-1&&!d.cancelado).length;
   if(meta.tipo==='receita')    return calcReceita().recTotal;
@@ -10269,7 +10282,7 @@ function calcValorMeta(meta){
 function clientesDaMeta(meta){
   const contratos=DB.contratos.filter(c=>c.s==='at');
   const recorrentes=(DB.recorrentes||[]).filter(r=>r.ativo);
-  if(meta.tipo==='clientes_contrato'||meta.tipo==='receita_contrato'){
+  if(meta.tipo==='clientes_contrato'||meta.tipo==='receita_contrato'||meta.tipo==='contratos_novos_mes'){
     const filtro=(meta.filtro||'').toLowerCase();
     const cont=contratos.filter(c=>!filtro||(c.srv||'').toLowerCase().includes(filtro));
     const recs=recorrentes.filter(r=>!filtro||(r.servico||'').toLowerCase().includes(filtro))
@@ -10297,7 +10310,7 @@ function rDashMetas(){
       const pct=Math.min(Math.round(atual/alvo*100),100);
       const bateu=atual>=alvo;
       const cor=bateu?'var(--green)':pct>=70?'var(--gold)':pct>=40?'var(--orange)':'var(--red)';
-      const isR=(meta.tipo==='receita'||meta.tipo==='receita_contrato'||meta.tipo==='cobrancas'||meta.unid==='R$');
+      const isR=(meta.tipo==='receita'||meta.tipo==='receita_contrato'||meta.tipo==='contratos_novos_mes'||meta.tipo==='cobrancas'||meta.unid==='R$');
       const fmtV=v=>isR?fmtR(Math.round(v)):`${v} ${meta.unid||''}`.trim();
 
       // Clientes vinculados (contratos que já contribuem)
@@ -10449,6 +10462,7 @@ function abrirGerenciarMetas(){
         <select class="fc" id="nm-tipo" onchange="atualizarCamposMeta(this.value)">
           <option value="clientes_contrato">👥 Nº de Clientes por Contrato (conta automaticamente)</option>
           <option value="receita_contrato">💰 Receita por Tipo de Contrato (soma automaticamente)</option>
+          <option value="contratos_novos_mes">🆕 Contratos Novos do Mês (zera todo mês)</option>
           <option value="receita">📈 Receita Total do Mês (automático)</option>
           <option value="os_feitas">🔧 OS Concluídas (automático)</option>
           <option value="vendas">🏆 Vendas Fechadas (automático)</option>
@@ -10489,7 +10503,7 @@ function atualizarCamposMeta(tipo){
   const semFiltro=['receita','os_feitas','vendas','leads','livre'];
   box.style.display=semFiltro.includes(tipo)?'none':'';
   if(unidEl){
-    const unids={clientes_contrato:'clientes',receita_contrato:'R$',receita:'R$',os_feitas:'OS',vendas:'vendas',leads:'leads',livre:'un'};
+    const unids={clientes_contrato:'clientes',receita_contrato:'R$',contratos_novos_mes:'R$',receita:'R$',os_feitas:'OS',vendas:'vendas',leads:'leads',livre:'un'};
     unidEl.value=unids[tipo]||'un';
   }
 }
@@ -10501,7 +10515,7 @@ function renderListaMetas(){
     const atual=calcValorMeta(m);
     const pct=Math.min(Math.round(atual/(parseFloat(m.alvo)||1)*100),100);
     const cor=pct>=100?'var(--green)':pct>=70?'var(--gold)':'var(--orange)';
-    const isR=(m.tipo==='receita'||m.tipo==='receita_contrato'||m.tipo==='cobrancas'||m.unid==='R$');
+    const isR=(m.tipo==='receita'||m.tipo==='receita_contrato'||m.tipo==='contratos_novos_mes'||m.tipo==='cobrancas'||m.unid==='R$');
     const fmtV=v=>isR?fmtR(Math.round(v)):`${v} ${m.unid||''}`.trim();
     return `<div style="display:flex;align-items:center;gap:8px;background:var(--s1);border-radius:9px;padding:9px 12px">
       <div style="flex:1">
